@@ -1,11 +1,13 @@
 # 一起去野餐｜HTML5 小遊戲
 
-**現在就玩：** https://skyhilam.github.io/kids-game/
+**現在就玩：** https://game1.iclover.net/kids-game/
 
 iPad／iPhone：用 **Safari** 打開上面網址即可。按分享鈕 →「加入主畫面」，之後可以像 App 一樣全螢幕玩。請不要用 WhatsApp／WeChat 內置預覽開啟，那些預覽多數唔會執行遊戲程式。
 
+`https://skyhilam.github.io/kids-game/` 會自動轉去同一個遊戲。
+
 ## 開始玩
-電腦：用瀏覽器開啟 [線上版本](https://skyhilam.github.io/kids-game/)，或本機開啟 `index.html`，按「出發啦！」。
+電腦：用瀏覽器開啟 [線上版本](https://game1.iclover.net/kids-game/)，或本機開啟 `index.html`，按「出發啦！」。
 手機／平板：建議用 Safari／Chrome 開啟上述網址。部分聊天軟件或檔案預覽不會執行 HTML 入面嘅 JavaScript。
 
 ## 玩法
@@ -23,7 +25,7 @@ iPad／iPhone：用 **Safari** 打開上面網址即可。按分享鈕 →「加
 地圖按提供相片嘅任務和規則重新繪製，唔係原書迷宮逐線複製。
 
 ## 網站部署
-已用 GitHub Pages 公開於 https://skyhilam.github.io/kids-game/ 。
+已用 GitHub Pages 公開於 https://game1.iclover.net/kids-game/ （`skyhilam.github.io/kids-game` 會轉去呢度）。
 將 `index.html` 放入網站任意公開目錄即可。
 純靜態檔案，毋須安裝套件、編譯、後端或資料庫。
 本機亦可在此目錄執行：
