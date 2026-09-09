@@ -1,4 +1,4 @@
-# 一起去野餐｜HTML5 小遊戲
+# 一起去野餐｜Vue 3 + TypeScript 小遊戲
 
 **現在就玩：** https://game1.iclover.net/kids-game/
 
@@ -42,7 +42,15 @@ iPad／iPhone：用 **Safari** 打開上面網址即可。按分享鈕 →「加
 裝置語音能否離線運作，視乎裝置有冇下載對應語音。
 
 ## 技術
-單一 HTML + CSS + JavaScript，原創內嵌 SVG 插圖。
+Vue 3 + TypeScript + Vite。畫面、關卡地圖同原創 SVG 插圖（`art-bear`、`art-car`、`art-burger`、`art-shop`、`art-home`、`art-park`、`art-picnic`、`art-picnic-place`、`art-tree`、`art-flower`）都保留。
 支援觸控、滑鼠、方向鍵，響應式手機／平板版面及減少動態效果設定。
-遊戲邏輯以無向路段記錄已走路線，禁止同一路段來回重複。
-沒有依賴外部框架。
+遊戲規則（無向路段、先漢堡後公園、提示搜尋）喺 `src/game/`，可用 `npm test` 驗證。
+公開 repo 嘅 `main` 已禁止 force-push／刪除分支，Wiki 關閉。
+
+本機開發：
+
+    npm install
+    npm test
+    npm run dev
+
+正式檔由 GitHub Actions 建置並發佈到 GitHub Pages。
