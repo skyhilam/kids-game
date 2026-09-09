@@ -1,0 +1,12 @@
+{
+  "name": "一起去野餐",
+  "short_name": "野餐",
+  "description": "3+ 歲親子小遊戲：點光圈開車，先買漢堡，再去公園野餐。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8f5ed",
+  "theme_color": "#f8f5ed",
+  "lang": "zh-Hant-HK",
+  "orientation": "any"
+}
