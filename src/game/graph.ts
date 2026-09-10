@@ -10,6 +10,13 @@ export function mapSize(narrow: boolean): { width: number; height: number } {
   return narrow ? { width: 600, height: 790 } : { width: 840, height: 660 };
 }
 
+/** Shop sprite sits above the node; clamp so a top-rail shop stays in the viewBox. */
+export const SHOP_ART = { width: 164, height: 135, dx: 82, dy: 165 } as const;
+
+export function shopArtOrigin(shop: Point): Point {
+  return [shop[0] - SHOP_ART.dx, Math.max(0, shop[1] - SHOP_ART.dy)];
+}
+
 export function makeGraph(index: number, narrow = false): Graph {
   const source = LEVELS[index];
   if (!source) throw new Error(`Unknown level ${index}`);
@@ -32,5 +39,27 @@ export function makeGraph(index: number, narrow = false): Graph {
     adj[edge.a].push({ edge, to: edge.b });
     adj[edge.b].push({ edge, to: edge.a });
   });
-  return { name: source.name, nodes, edges, adj };
+  const { start, shop, park } = source;
+  const deadends = Object.keys(nodes).filter(
+    (id) => id !== start && id !== shop && id !== park && adj[id].length === 1,
+  );
+  const titles: Record<NodeId, string> = {};
+  Object.keys(nodes).forEach((id) => { titles[id] = '路口'; });
+  titles[start] = '出發';
+  titles[shop] = '漢堡店';
+  titles[park] = '公園';
+  deadends.forEach((id) => { titles[id] = '小路盡頭'; });
+  return {
+    name: source.name,
+    short: source.short,
+    start,
+    shop,
+    park,
+    tutorial: !!source.tutorial,
+    titles,
+    deadends,
+    nodes,
+    edges,
+    adj,
+  };
 }

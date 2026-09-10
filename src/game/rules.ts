@@ -1,18 +1,19 @@
 import { makeGraph } from './graph';
 import { LEVELS } from './levels';
-import type { GameState, Graph, Link, MoveResult, NodeId } from './types';
+import type { GameState, Graph, Link, MoveOk, MoveResult, NodeId } from './types';
 
 export { LEVELS } from './levels';
-export { makeGraph, roadKey, mapSize } from './graph';
+export { makeGraph, roadKey, mapSize, shopArtOrigin, SHOP_ART } from './graph';
 export type { GameState, Graph, Link, MoveResult, NodeId } from './types';
 
 export function createGame(levelIndex = 0, narrow = false): { graph: Graph; state: GameState } {
   const level = Math.max(0, Math.min(levelIndex, LEVELS.length - 1));
+  const graph = makeGraph(level, narrow);
   return {
-    graph: makeGraph(level, narrow),
+    graph,
     state: {
       level,
-      node: 's',
+      node: graph.start,
       burger: false,
       used: new Set(),
       won: false,
@@ -37,13 +38,13 @@ export function findSolution(
 ): NodeId[] | null {
   const failed = new Set<string>();
   const search = (n: NodeId, hasBurger: boolean, mask: number): NodeId[] | null => {
-    if (n === 'p') return hasBurger ? [] : null;
+    if (n === graph.park) return hasBurger ? [] : null;
     const key = `${n}/${hasBurger ? 1 : 0}/${mask}`;
     if (failed.has(key)) return null;
     for (const link of graph.adj[n]) {
       const bit = 1 << link.edge.index;
       if (mask & bit) continue;
-      const result = search(link.to, hasBurger || link.to === 'h', mask | bit);
+      const result = search(link.to, hasBurger || link.to === graph.shop, mask | bit);
       if (result !== null) return [link.to, ...result];
     }
     failed.add(key);
@@ -65,43 +66,45 @@ export function tryMove(graph: Graph, state: GameState, to: NodeId): MoveResult 
 
   const from = state.node;
   const reverse = adjacent.edge.a !== from;
-  state.used.add(adjacent.edge.id);
-  state.node = to;
-  let boughtNow = false;
-  if (to === 'h' && !state.burger) {
-    state.burger = true;
-    boughtNow = true;
-  }
+  const boughtNow = to === graph.shop && !state.burger;
+  const burger = state.burger || boughtNow;
+  const used = new Set(state.used);
+  used.add(adjacent.edge.id);
 
-  if (to === 'p') {
-    if (state.burger) {
-      state.won = true;
+  if (to === graph.park) {
+    if (burger) {
       return {
         ok: true, from, to, edgeId: adjacent.edge.id, reverse,
-        burger: true, boughtNow, won: true, stalled: false,
+        burger, boughtNow, won: true, stalled: false,
       };
     }
-    state.stalled = 'burger';
     return {
       ok: true, from, to, edgeId: adjacent.edge.id, reverse,
-      burger: state.burger, boughtNow, won: false, stalled: 'burger',
+      burger, boughtNow, won: false, stalled: 'burger',
     };
   }
 
-  if (!available(graph, state.node, state.used).length) {
-    state.stalled = 'deadend';
+  if (!available(graph, to, used).length) {
     return {
       ok: true, from, to, edgeId: adjacent.edge.id, reverse,
-      burger: state.burger, boughtNow, won: false, stalled: 'deadend',
+      burger, boughtNow, won: false, stalled: 'deadend',
     };
   }
 
   return {
     ok: true, from, to, edgeId: adjacent.edge.id, reverse,
-    burger: state.burger, boughtNow, won: false, stalled: false,
+    burger, boughtNow, won: false, stalled: false,
   };
 }
 
-export function isWin(state: GameState): boolean {
-  return state.won === true && state.node === 'p' && state.burger === true;
+export function applyMove(state: GameState, move: MoveOk): void {
+  state.used.add(move.edgeId);
+  state.node = move.to;
+  state.burger = move.burger;
+  state.won = move.won;
+  state.stalled = move.stalled;
+}
+
+export function isWin(graph: Graph, state: GameState): boolean {
+  return state.won === true && state.node === graph.park && state.burger === true;
 }

@@ -3,6 +3,11 @@ export type Point = [number, number];
 
 export interface LevelDef {
   name: string;
+  short: string;
+  start: NodeId;
+  shop: NodeId;
+  park: NodeId;
+  tutorial?: boolean;
   nodes: Record<NodeId, Point>;
   edges: [NodeId, NodeId][];
 }
@@ -22,6 +27,13 @@ export interface Link {
 
 export interface Graph {
   name: string;
+  short: string;
+  start: NodeId;
+  shop: NodeId;
+  park: NodeId;
+  tutorial: boolean;
+  titles: Record<NodeId, string>;
+  deadends: NodeId[];
   nodes: Record<NodeId, Point>;
   edges: Edge[];
   adj: Record<NodeId, Link[]>;
@@ -54,3 +66,15 @@ export type MoveOk = {
 };
 
 export type MoveResult = MoveFail | MoveOk;
+
+export type InFlightMove = MoveOk & {
+  t: number;
+  startAngle: number;
+};
+
+export type Overlay =
+  | { kind: 'welcome' }
+  | { kind: 'help' }
+  | { kind: 'rescue' }
+  | { kind: 'stuck'; reason: 'burger' | 'deadend' }
+  | { kind: 'win' };

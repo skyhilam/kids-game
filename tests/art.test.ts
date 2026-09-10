@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -8,11 +8,16 @@ const sprites = readFileSync(join(root, 'src/assets/sprites.svg'), 'utf8');
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
   dependencies?: Record<string, string>;
 };
-const ui = [
-  readFileSync(join(root, 'src/components/GameBoard.vue'), 'utf8'),
-  readFileSync(join(root, 'src/App.vue'), 'utf8'),
-  readFileSync(join(root, 'src/components/SpriteDefs.vue'), 'utf8'),
-].join('\n');
+
+function vueFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return vueFiles(path);
+    return entry.name.endsWith('.vue') ? [path] : [];
+  });
+}
+
+const ui = vueFiles(join(root, 'src')).map((path) => readFileSync(path, 'utf8')).join('\n');
 
 const ART_IDS = [
   'art-bear',
