@@ -105,6 +105,19 @@ async function mapFingerprint(page) {
     .join(';'));
 }
 
+async function deliveryFingerprint(page) {
+  return page.evaluate(() => {
+    const roads = [...document.querySelectorAll('.delivery-road')]
+      .map((path) => path.getAttribute('d'))
+      .sort()
+      .join(';');
+    const start = document.querySelector('[data-delivery-start]')?.getAttribute('transform');
+    const finish = document.querySelector('[data-delivery-finish]')?.getAttribute('transform');
+    const houses = [...document.querySelectorAll('[data-house]')].map((node) => node.getAttribute('transform'));
+    return `${roads}|${start}|${finish}|${houses.join('|')}`;
+  });
+}
+
 async function playFromFirstMap(page) {
   await waitPlayable(page);
   const badge = await page.locator('.level-badge').innerText();
@@ -185,6 +198,17 @@ async function runActivities(page) {
   if (!deliveryBoard || deliveryBoard.width < 200 || deliveryBoard.height < 150) {
     throw new Error(`delivery board too small: ${JSON.stringify(deliveryBoard)}`);
   }
+  const deliveryFirst = await deliveryFingerprint(page);
+  await page.screenshot({ path: join(outDir, 'delivery-generated.png'), fullPage: true });
+  await goHome(page);
+  await page.getByRole('button', { name: '送貨員來了 畫線送到 1、2、3 號屋，貼上包裹再到終點。' }).click();
+  await page.getByRole('button', { name: '開始送貨' }).click();
+  await page.waitForFunction(() => !document.querySelector('dialog')?.open);
+  const deliverySecond = await deliveryFingerprint(page);
+  if (!deliveryFirst || deliveryFirst === deliverySecond) {
+    throw new Error('reopening delivery should shuffle the map');
+  }
+  log('desktop delivery: reopening shuffled the map');
   await goHome(page);
 
   if (errors.length) throw new Error(`activity errors: ${errors.join(' | ')}`);

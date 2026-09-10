@@ -1,4 +1,5 @@
-import { generateMaze, randomSeed } from '../game/generate';
+import { generateMaze } from '../game/generate';
+import { randomSeed } from '../game/rng';
 import type { LevelDef } from '../game/types';
 
 export const TOOTH_LEVELS: readonly LevelDef[] = [

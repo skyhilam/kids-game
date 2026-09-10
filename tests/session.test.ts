@@ -504,6 +504,16 @@ describe('dialog wiring', () => {
     expect(host).not.toMatch(/overlay\?\.kind/);
 
     const delivery = readFileSync(join(root, 'src/components/DeliveryPlay.vue'), 'utf8');
+    expect(delivery).toMatch(/const source = deliveryMission\(\);/);
+    expect(delivery).not.toMatch(/DELIVERY_MISSION/);
+    expect(delivery).not.toMatch(/generateDeliveryMission/);
+    expect(delivery).not.toMatch(/randomSeed/);
+    const deliveryBoard = readFileSync(join(root, 'src/components/DeliveryBoard.vue'), 'utf8');
+    expect(deliveryBoard).toMatch(/function houseAbove\(node: string\): boolean/);
+    expect(deliveryBoard).toMatch(/nodes\[node\]\[1\] < props\.mission\.height \* 0\.42/);
+    expect(deliveryBoard).toMatch(/houseAbove\(stop\.node\) \? -115 : 20/);
+    expect(deliveryBoard).toMatch(/houseAbove\(stop\.node\) \? -48 : 71/);
+    expect(deliveryBoard).not.toMatch(/index === 1 \? -115/);
     expect(delivery).toMatch(/<MazeDialog/);
     expect(delivery).toMatch(/:cancelable="overlay === 'help'"/);
     expect(delivery).toMatch(

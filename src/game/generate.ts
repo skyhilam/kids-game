@@ -1,11 +1,12 @@
+import { firstValid, generateGridMaze, type Grid } from './gridMaze';
 import { makeGraph } from './graph';
+import { mixSeed, mulberry32, pick, shuffle } from './rng';
 import { findSolution } from './rules';
 import type { LevelDef, NodeId, Point } from './types';
 
 export type MazeKind = 'picnic' | 'tooth';
 
 type Title = { name: string; short: string };
-type Grid = { xs: number[]; ys: number[] };
 
 const PICNIC_TITLES: Title[] = [
   { name: '新的小路', short: '新路' },
@@ -29,35 +30,6 @@ const GRID_3x2: Grid = { xs: [135, 435, 685], ys: [215, 500] };
 const GRID_3x3: Grid = { xs: [135, 435, 685], ys: [155, 345, 545] };
 const GRID_4x3: Grid = { xs: [120, 320, 520, 720], ys: [155, 345, 545] };
 
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function pick<T>(rand: () => number, items: readonly T[]): T {
-  return items[Math.floor(rand() * items.length)]!;
-}
-
-function shuffle<T>(rand: () => number, items: readonly T[]): T[] {
-  const next = items.slice();
-  for (let i = next.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rand() * (i + 1));
-    const left = next[i]!;
-    next[i] = next[j]!;
-    next[j] = left;
-  }
-  return next;
-}
-
-function cellId(row: number, col: number): string {
-  return `r${row}c${col}`;
-}
-
 function hypot(a: Point, b: Point): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1]);
 }
@@ -70,29 +42,6 @@ function gridFor(kind: MazeKind, index: number, rand: () => number): Grid {
   if (kind === 'tooth' && roll > 0.78) return GRID_4x3;
   if (roll < 0.2) return GRID_3x2;
   return GRID_3x3;
-}
-
-function spanningTree(
-  ids: string[],
-  candidates: [string, string][],
-  rand: () => number,
-): [string, string][] {
-  const parent = new Map<string, string>(ids.map((id) => [id, id]));
-  const find = (id: string): string => {
-    let cur = id;
-    while (parent.get(cur) !== cur) cur = parent.get(cur)!;
-    return cur;
-  };
-  const tree: [string, string][] = [];
-  for (const [a, b] of shuffle(rand, candidates)) {
-    const pa = find(a);
-    const pb = find(b);
-    if (pa === pb) continue;
-    parent.set(pa, pb);
-    tree.push([a, b]);
-    if (tree.length === ids.length - 1) break;
-  }
-  return tree;
 }
 
 function addSpur(
@@ -170,63 +119,20 @@ function fallback(kind: MazeKind, index: number): LevelDef {
   };
 }
 
-export function randomSeed(): number {
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const bytes = new Uint32Array(1);
-    crypto.getRandomValues(bytes);
-    return bytes[0]!;
-  }
-  return (Math.random() * 0x100000000) >>> 0;
-}
-
-function mixSeed(seed: number, index: number, kind: MazeKind, attemptNo: number): number {
-  return (
-    Math.imul(seed >>> 0, 2246822519)
-    + (index + 1) * 10007
-    + (kind === 'picnic' ? 17 : 41)
-    + attemptNo * 997
-  ) >>> 0;
+function mazeSalt(kind: MazeKind, index: number): number {
+  return (index + 1) * 10007 + (kind === 'picnic' ? 17 : 41);
 }
 
 function attempt(kind: MazeKind, index: number, attemptNo: number, seed: number): LevelDef | null {
-  const rand = mulberry32(mixSeed(seed, index, kind, attemptNo));
+  const rand = mulberry32(mixSeed(seed, mazeSalt(kind, index), attemptNo));
   const grid = gridFor(kind, index, rand);
-  const nodes: Record<NodeId, Point> = {};
-  const ids: string[] = [];
-  grid.ys.forEach((y, row) => {
-    grid.xs.forEach((x, col) => {
-      const id = cellId(row, col);
-      ids.push(id);
-      nodes[id] = [x, y];
-    });
-  });
-  const candidates: [string, string][] = [];
-  grid.ys.forEach((_, row) => {
-    grid.xs.forEach((_, col) => {
-      if (col + 1 < grid.xs.length) candidates.push([cellId(row, col), cellId(row, col + 1)]);
-      if (row + 1 < grid.ys.length) candidates.push([cellId(row, col), cellId(row + 1, col)]);
-    });
-  });
-  const tree = spanningTree(ids, candidates, rand);
-  if (tree.length !== ids.length - 1) return null;
-  const treeKeys = new Set(tree.map(([a, b]) => [a, b].sort().join('-')));
-  const extraPool = candidates.filter(([a, b]) => !treeKeys.has([a, b].sort().join('-')));
-  const extraWanted = 1 + Math.min(kind === 'picnic' ? 4 : 3, Math.floor(index / 4) + (rand() > 0.5 ? 1 : 0));
-  const edges: [string, string][] = [...tree, ...shuffle(rand, extraPool).slice(0, extraWanted)];
-
-  const corners = [
-    cellId(0, 0),
-    cellId(0, grid.xs.length - 1),
-    cellId(grid.ys.length - 1, 0),
-    cellId(grid.ys.length - 1, grid.xs.length - 1),
-  ];
-  const start = pick(rand, corners);
-  const ranked = ids
-    .filter((id) => id !== start)
-    .sort((a, b) => hypot(nodes[b]!, nodes[start]!) - hypot(nodes[a]!, nodes[start]!));
-  const goal = ranked.find((id) => hypot(nodes[id]!, nodes[start]!) >= 280) ?? ranked[0];
-  if (!goal || goal === start) return null;
-
+  const maze = generateGridMaze(
+    rand,
+    grid,
+    () => 1 + Math.min(kind === 'picnic' ? 4 : 3, Math.floor(index / 4) + (rand() > 0.5 ? 1 : 0)),
+  );
+  if (!maze) return null;
+  const { ids, nodes, edges, start, goal } = maze;
   const title = (kind === 'picnic' ? PICNIC_TITLES : TOOTH_TITLES)[index % 6]!;
 
   if (kind === 'picnic') {
@@ -264,9 +170,5 @@ function attempt(kind: MazeKind, index: number, attemptNo: number, seed: number)
 }
 
 export function generateMaze(kind: MazeKind, index: number, seed = 0): LevelDef {
-  for (let i = 0; i < 64; i += 1) {
-    const level = attempt(kind, index, i, seed);
-    if (level) return level;
-  }
-  return fallback(kind, index);
+  return firstValid(64, (attemptNo) => attempt(kind, index, attemptNo, seed), () => fallback(kind, index));
 }

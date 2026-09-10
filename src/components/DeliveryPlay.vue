@@ -3,12 +3,13 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import GameSprite from './GameSprite.vue';
 import DeliveryBoard from './DeliveryBoard.vue';
 import MazeDialog from './MazeDialog.vue';
-import { DELIVERY_MISSION } from '../delivery/mission';
+import { deliveryMission } from '../delivery/generate';
 import { createRouteState, findRouteSolution, moveOnRoute, stampDelivery, type RouteFailure, type RouteMission } from '../game/routeMission';
 import type { Point } from '../game/types';
 
 const emit = defineEmits<{ home: [] }>();
-const state = reactive(createRouteState(DELIVERY_MISSION));
+const source = deliveryMission();
+const state = reactive(createRouteState(source));
 const narrow = ref(window.innerWidth <= 600);
 const mode = ref<'trace' | 'tap'>('trace');
 const epoch = ref(0);
@@ -17,7 +18,6 @@ const tracingTo = ref<string | null>(null);
 const message = ref('先找一找 1 號屋，再從小車開始畫線。');
 const overlay = ref<'welcome' | 'help' | 'win' | 'stuck' | null>('welcome');
 const mission = computed<RouteMission>(() => {
-  const source = DELIVERY_MISSION;
   if (!narrow.value) return source;
   return { ...source, width: 600, height: 820, nodes: Object.fromEntries(Object.entries(source.nodes)
     .map(([id, [x, y]]) => [id, [x / source.width * 600, y / source.height * 820] as Point])) };

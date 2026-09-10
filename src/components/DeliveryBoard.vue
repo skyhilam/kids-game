@@ -50,6 +50,9 @@ function targetLabel(node: string): string {
   const direction = Math.abs(angle) < 45 ? '右方' : Math.abs(angle) > 135 ? '左方' : angle > 0 ? '下方' : '上方';
   return `前往${direction}的${title(node)}`;
 }
+function houseAbove(node: string): boolean {
+  return props.mission.nodes[node][1] < props.mission.height * 0.42;
+}
 function percent(node: string): { left: string; top: string } {
   const [x, y] = props.mission.nodes[node];
   return { left: `${x / props.mission.width * 100}%`, top: `${y / props.mission.height * 100}%` };
@@ -94,19 +97,19 @@ watch([() => props.state.node, () => props.enabled], async () => {
         </g>
         <g fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path v-for="road in roads" :key="`border-${road.id}`" :d="road.path" stroke="#ced8bf" stroke-width="48"/>
-          <path v-for="road in roads" :key="road.id" :d="road.path" stroke="#fffdf5" stroke-width="39"/>
+          <path v-for="road in roads" :key="road.id" class="delivery-road" :d="road.path" stroke="#fffdf5" stroke-width="39"/>
           <path v-for="road in roads.filter((r) => state.used.has(r.id))" :key="`ink-${road.id}`" :d="road.path" stroke="#dd9161" stroke-width="12"/>
           <path v-if="trace" :d="partial" stroke="#dd9161" stroke-width="12"/>
           <path v-if="hintPath" :d="hintPath" stroke="#549785" stroke-width="9" stroke-dasharray="2 17"/>
         </g>
         <g aria-hidden="true">
           <circle v-for="(point, id) in mission.nodes" :key="id" :cx="point[0]" :cy="point[1]" r="5" fill="#d6dcc8"/>
-          <g :transform="`translate(${mission.nodes.start.join(' ')})`">
+          <g data-delivery-start :transform="`translate(${mission.nodes.start.join(' ')})`">
             <rect x="-46" y="-88" width="92" height="33" rx="16" fill="#fff8ee"/>
             <text y="-66" text-anchor="middle" fill="#ba5944" font-size="18" font-weight="800">紅色起點</text>
             <path d="M-29 0H27M13-13 28 0 13 13" fill="none" stroke="#d96f53" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
           </g>
-          <g :transform="`translate(${mission.nodes.finish.join(' ')})`">
+          <g data-delivery-finish :transform="`translate(${mission.nodes.finish.join(' ')})`">
             <circle r="26" fill="#e0eff3" stroke="#68a6bc" stroke-width="2"/>
             <path d="M-13 0H13M2-10 13 0 2 10" fill="none" stroke="#4e91ae" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
             <rect x="-43" y="-65" width="86" height="30" rx="15" fill="#f5fcfc"/>
@@ -114,10 +117,10 @@ watch([() => props.state.node, () => props.enabled], async () => {
           </g>
         </g>
         <g v-for="(stop, index) in mission.stops" :key="stop.node" :data-house="index + 1" :transform="`translate(${mission.nodes[stop.node].join(' ')})`" aria-hidden="true">
-          <GameSprite name="home" x="-48" :y="index === 1 ? -115 : 20" width="96" height="87"/>
+          <GameSprite name="home" x="-48" :y="houseAbove(stop.node) ? -115 : 20" width="96" height="87"/>
           <circle r="23" :fill="index < state.delivered ? '#608d72' : '#fffdf4'" :stroke="index === state.delivered ? '#d8944f' : '#8ca57e'" stroke-width="3"/>
           <text y="8" text-anchor="middle" font-size="26" font-weight="850" :fill="index < state.delivered ? '#fffdf4' : '#557348'">{{ index + 1 }}</text>
-          <g v-if="index < state.delivered" class="delivery-sticker" :transform="`translate(23 ${index === 1 ? -48 : 71})`" :data-delivered="index + 1">
+          <g v-if="index < state.delivered" class="delivery-sticker" :transform="`translate(23 ${houseAbove(stop.node) ? -48 : 71})`" :data-delivered="index + 1">
             <circle r="26" fill="#fffdf7" stroke="#e2bd74" stroke-width="2" stroke-dasharray="3 3"/>
             <GameSprite name="parcel" x="-21" y="-21" width="42" height="42"/>
             <circle cx="20" cy="15" r="10" fill="#608d72"/><text x="20" y="20" text-anchor="middle" font-size="14" fill="white">✓</text>
