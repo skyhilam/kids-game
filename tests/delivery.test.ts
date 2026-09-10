@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { deliveryMission, generateDeliveryMission } from '../src/delivery/generate';
 import { DELIVERY_MISSION } from '../src/delivery/mission';
 import { roadKey } from '../src/game/graph';
-import { checkRouteMove, createRouteState, findRouteSolution, moveOnRoute, stampDelivery, type RouteMission } from '../src/game/routeMission';
+import { checkRouteMove, createRouteState, findRouteSolution, moveOnRoute, type RouteMission } from '../src/game/routeMission';
 import { projectToRoad, traceAlongRoad } from '../src/game/trace';
 
 const route = ['a', 'e', 'end', 'g', 'house1', 'd', 'b', 'house2', 'c', 'd', 'e', 'f', 'house3', 'j', 'finish'];
@@ -59,16 +59,13 @@ function houseAbove(mission: RouteMission, node: string): boolean {
 }
 
 describe('delivery mission', () => {
-  it('completes the photographed rules: 1 → 2 → 3, stickers, then finish, without reusing roads', () => {
+  it('completes the photographed rules: 1 → 2 → 3 on arrival, then finish, without reusing roads', () => {
     const state = createRouteState(DELIVERY_MISSION);
     const arrivals: string[] = [];
     for (const node of route) {
+      const before = state.delivered;
       expect(moveOnRoute(DELIVERY_MISSION, state, node), node).toEqual({ ok: true });
-      if (state.pendingStamp) {
-        arrivals.push(node);
-        expect(state.delivered).toBe(arrivals.length - 1);
-        expect(stampDelivery(DELIVERY_MISSION, state)).toBe(true);
-      }
+      if (state.delivered > before) arrivals.push(node);
     }
     expect(arrivals).toEqual(['house1', 'house2', 'house3']);
     expect(state.delivered).toBe(3);
@@ -86,14 +83,10 @@ describe('delivery mission', () => {
     expect(state.used.has(roadKey('b', 'house2'))).toBe(false);
   });
 
-  it('requires an arrival and exactly one sticker before departing each house', () => {
+  it('delivers on arrival at the next house and can leave immediately', () => {
     const state = createRouteState(DELIVERY_MISSION);
-    expect(stampDelivery(DELIVERY_MISSION, state)).toBe(false);
     for (const node of route.slice(0, 5)) moveOnRoute(DELIVERY_MISSION, state, node);
-    expect(state.pendingStamp).toBe(true);
-    expect(moveOnRoute(DELIVERY_MISSION, state, 'd')).toEqual({ ok: false, reason: 'blocked' });
-    expect(stampDelivery(DELIVERY_MISSION, state)).toBe(true);
-    expect(stampDelivery(DELIVERY_MISSION, state)).toBe(false);
+    expect(state.node).toBe('house1');
     expect(state.delivered).toBe(1);
     expect(moveOnRoute(DELIVERY_MISSION, state, 'd').ok).toBe(true);
   });
@@ -105,7 +98,6 @@ describe('delivery mission', () => {
     const other = createRouteState(DELIVERY_MISSION);
     for (const node of route.slice(0, 11)) {
       expect(moveOnRoute(DELIVERY_MISSION, other, node).ok).toBe(true);
-      if (other.pendingStamp) stampDelivery(DELIVERY_MISSION, other);
     }
     expect(other.node).toBe('e'); // Second visit to e is legal.
   });
@@ -122,7 +114,7 @@ describe('delivery mission', () => {
     expect(findRouteSolution(mission, state)).toBeNull();
   });
 
-  it('offers a valid continuation at every point, even while awaiting a sticker, without mutating play', () => {
+  it('offers a valid continuation at every point without mutating play', () => {
     const state = createRouteState(DELIVERY_MISSION);
     for (const node of route) {
       const before = { ...state, used: new Set(state.used) };
@@ -130,13 +122,10 @@ describe('delivery mission', () => {
       expect(state).toEqual(before);
       expect(path).not.toBeNull();
       const preview = { ...state, used: new Set(state.used) };
-      if (preview.pendingStamp) stampDelivery(DELIVERY_MISSION, preview);
       for (const next of path!) {
         expect(moveOnRoute(DELIVERY_MISSION, preview, next).ok).toBe(true);
-        if (preview.pendingStamp) stampDelivery(DELIVERY_MISSION, preview);
       }
       expect(preview.won).toBe(true);
-      if (state.pendingStamp) stampDelivery(DELIVERY_MISSION, state);
       moveOnRoute(DELIVERY_MISSION, state, node);
     }
   });
@@ -145,12 +134,11 @@ describe('delivery mission', () => {
     const state = createRouteState(DELIVERY_MISSION);
     // This uses the road needed to leave house 1 before reaching it.
     for (const node of ['a', 'b', 'd', 'house1']) moveOnRoute(DELIVERY_MISSION, state, node);
-    stampDelivery(DELIVERY_MISSION, state);
+    expect(state.delivered).toBe(1);
     expect(findRouteSolution(DELIVERY_MISSION, state)).toBeNull();
     const fresh = createRouteState(DELIVERY_MISSION);
     expect(fresh.delivered).toBe(0);
     expect(fresh.used.size).toBe(0);
-    expect(fresh.pendingStamp).toBe(false);
   });
 });
 

@@ -4,7 +4,7 @@ import GameSprite from './GameSprite.vue';
 import DeliveryBoard from './DeliveryBoard.vue';
 import MazeDialog from './MazeDialog.vue';
 import { deliveryMission } from '../delivery/generate';
-import { createRouteState, findRouteSolution, moveOnRoute, stampDelivery, type RouteFailure, type RouteMission } from '../game/routeMission';
+import { createRouteState, findRouteSolution, moveOnRoute, type RouteFailure, type RouteMission } from '../game/routeMission';
 import type { Point } from '../game/types';
 
 const emit = defineEmits<{ home: [] }>();
@@ -22,7 +22,7 @@ const mission = computed<RouteMission>(() => {
   return { ...source, width: 600, height: 820, nodes: Object.fromEntries(Object.entries(source.nodes)
     .map(([id, [x, y]]) => [id, [x / source.width * 600, y / source.height * 820] as Point])) };
 });
-const enabled = computed(() => !overlay.value && !state.pendingStamp && !state.won && !state.stalled);
+const enabled = computed(() => !overlay.value && !state.won && !state.stalled);
 const nextStop = computed(() => mission.value.stops[state.delivered]?.label ?? '藍色終點');
 const dialogTitle = computed(() => overlay.value === 'welcome' ? '小小送貨員，出發！'
   : overlay.value === 'help' ? '這次怎樣送貨？'
@@ -38,21 +38,18 @@ function feedback(reason: RouteFailure | 'off-road' | 'start-at-truck'): void {
 
 function move(to: string): void {
   if (!enabled.value) return;
+  const before = state.delivered;
   const result = moveOnRoute(mission.value, state, to);
   if (!result.ok) { feedback(result.reason); return; }
   hint.value = null;
   if (state.won) { message.value = '三份包裹都送好了，也到達終點了！'; overlay.value = 'win'; }
-  else if (state.pendingStamp) message.value = `到達 ${nextStop.value}！按「貼包裹」，把包裹放在屋前。`;
   else if (state.stalled) overlay.value = 'stuck';
+  else if (state.delivered > before) {
+    message.value = state.delivered === mission.value.stops.length
+      ? '三份包裹都送好了！沿未走過的小路，到藍色終點吧。'
+      : `第 ${state.delivered} 份包裹送到了！下一站是 ${nextStop.value}。`;
+  }
   else message.value = `下一站：${nextStop.value}。看看還有哪些白色小路。`;
-}
-
-function stamp(): void {
-  if (overlay.value || !stampDelivery(mission.value, state)) return;
-  message.value = state.delivered === mission.value.stops.length
-    ? '三份包裹都送好了！沿未走過的小路，到藍色終點吧。'
-    : `第 ${state.delivered} 份包裹送到了！下一站是 ${nextStop.value}。`;
-  if (state.stalled) overlay.value = 'stuck';
 }
 
 function restart(): void {
@@ -111,7 +108,7 @@ onUnmounted(() => window.removeEventListener('resize', resize));
       <ol class="delivery-stops">
         <li v-for="(stop, index) in mission.stops" :key="stop.node" :class="{ delivered: index < state.delivered, current: index === state.delivered }" :aria-current="index === state.delivered ? 'step' : undefined">
           <span class="delivery-number">{{ index + 1 }}</span>
-          <span>{{ stop.label }}<small>{{ index < state.delivered ? '已貼包裹 ✓' : index === state.delivered ? '下一站' : '等待送貨' }}</small></span>
+          <span>{{ stop.label }}<small>{{ index < state.delivered ? '已送到 ✓' : index === state.delivered ? '下一站' : '等待送貨' }}</small></span>
         </li>
         <li class="delivery-finish-step" :class="{ current: state.delivered === 3, delivered: state.won }"><span class="delivery-number">⚑</span><span>終點<small>{{ state.won ? '已完成 ✓' : '送完再去' }}</small></span></li>
       </ol>
@@ -125,7 +122,7 @@ onUnmounted(() => window.removeEventListener('resize', resize));
       <span>{{ mode === 'trace' ? '按住小車，沿路慢慢畫' : '按箭嘴，選下一段路' }}</span>
     </div>
 
-    <DeliveryBoard :key="epoch" :mission="mission" :state="state" :enabled="enabled" :mode="mode" :hint="hint" @move="move" @stamp="stamp" @feedback="feedback" @tracing="tracingTo = $event"/>
+    <DeliveryBoard :key="epoch" :mission="mission" :state="state" :enabled="enabled" :mode="mode" :hint="hint" @move="move" @feedback="feedback" @tracing="tracingTo = $event"/>
 
     <section class="bottom-bar" aria-label="送貨提示及操作">
       <div class="guide">
@@ -133,8 +130,7 @@ onUnmounted(() => window.removeEventListener('resize', resize));
         <div class="guide-copy"><div class="guide-main" role="status" aria-live="polite">{{ message }}</div><div class="guide-sub">{{ mode === 'trace' ? '可以停下、放手，再從小車繼續。' : '按箭嘴或方向鍵選路。' }}橙色小路不能再走。</div></div>
       </div>
       <div class="bottom-actions">
-        <button v-if="state.pendingStamp" class="action-button hint" @click="stamp"><GameSprite name="parcel"/><span>貼包裹</span></button>
-        <button v-else class="action-button hint" :disabled="!enabled" @click="showHint"><svg aria-hidden="true"><use href="#i-bulb"/></svg>提示</button>
+        <button class="action-button hint" :disabled="!enabled" @click="showHint"><svg aria-hidden="true"><use href="#i-bulb"/></svg>提示</button>
         <button class="action-button" @click="restart"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#i-restart"/></svg>重新開始</button>
       </div>
     </section>
@@ -155,7 +151,7 @@ onUnmounted(() => window.removeEventListener('resize', resize));
       <template v-if="overlay === 'welcome' || overlay === 'help'">
         <ol class="delivery-rules">
           <li><span>1</span><div>紅色起點出發<strong>按住小車，沿白色小路畫線。</strong></div></li>
-          <li><span>2</span><div>依序送到 1 → 2 → 3 號屋<strong>每到一間屋，按一下貼上包裹。</strong></div></li>
+          <li><span>2</span><div>依序送到 1 → 2 → 3 號屋<strong>到達房子，包裹便會自動送到。</strong></div></li>
           <li><span>3</span><div>送完，再到藍色終點<strong>同一段路不能走兩次，反方向也不行。</strong></div></li>
         </ol>
         <details class="delivery-parent"><summary>給家長的小提示</summary><p>先一起找起點、三間屋和終點。問孩子：「先去邊間屋？返程有冇另一條路？」第一次可用點選路口；想畫線時，再用手指或觸控筆慢慢走。可以重經路口，但不能重走已變橙色的路段。</p></details>

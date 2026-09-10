@@ -105,6 +105,28 @@ async function mapFingerprint(page) {
     .join(';'));
 }
 
+async function deliverUntilFirstHouse(page) {
+  await page.getByRole('button', { name: '點選路口' }).click();
+  for (let i = 0; i < 24; i += 1) {
+    const score = await page.locator('.delivery-manifest-label strong').innerText();
+    if (score.trim().startsWith('1')) {
+      if (await page.getByText('貼包裹').count()) throw new Error('stamp button still shown after arrival');
+      if (await page.locator('[data-delivered]').count() < 1) throw new Error('no house sticker after arrival');
+      return;
+    }
+    await page.getByRole('button', { name: '提示' }).click();
+    const stuckOpen = await page.evaluate(() => {
+      const dialog = document.querySelector('dialog');
+      return Boolean(dialog?.open && dialog.textContent?.includes('停一停'));
+    });
+    if (stuckOpen) throw new Error('hint said delivery is stuck before the first house');
+    const hinted = page.locator('.delivery-target.hinted');
+    await hinted.waitFor({ state: 'visible' });
+    await hinted.click();
+  }
+  throw new Error('did not auto-deliver the first house');
+}
+
 async function deliveryFingerprint(page) {
   return page.evaluate(() => {
     const roads = [...document.querySelectorAll('.delivery-road')]
@@ -186,7 +208,7 @@ async function runActivities(page) {
   if (await page.locator('.step-target').count() < 1) throw new Error('no tooth move targets after start');
   await goHome(page);
 
-  await page.getByRole('button', { name: '送貨員來了 畫線送到 1、2、3 號屋，貼上包裹再到終點。' }).click();
+  await page.getByRole('button', { name: '送貨員來了 畫線送到 1、2、3 號屋，再到終點。' }).click();
   await page.getByRole('button', { name: '開始送貨' }).waitFor();
   const deliverySprites = await spriteNames(page);
   for (const name of ['truck', 'truck-top', 'home']) {
@@ -199,9 +221,11 @@ async function runActivities(page) {
     throw new Error(`delivery board too small: ${JSON.stringify(deliveryBoard)}`);
   }
   const deliveryFirst = await deliveryFingerprint(page);
+  await deliverUntilFirstHouse(page);
   await page.screenshot({ path: join(outDir, 'delivery-generated.png'), fullPage: true });
+  log('desktop delivery: first house auto-delivered, no stamp button');
   await goHome(page);
-  await page.getByRole('button', { name: '送貨員來了 畫線送到 1、2、3 號屋，貼上包裹再到終點。' }).click();
+  await page.getByRole('button', { name: '送貨員來了 畫線送到 1、2、3 號屋，再到終點。' }).click();
   await page.getByRole('button', { name: '開始送貨' }).click();
   await page.waitForFunction(() => !document.querySelector('dialog')?.open);
   const deliverySecond = await deliveryFingerprint(page);

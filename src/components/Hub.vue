@@ -37,7 +37,7 @@ const emit = defineEmits<{
           <GameSprite name="parcel" x="156" y="68" width="40" height="38"/>
         </svg>
         <strong>送貨員來了</strong>
-        <span>畫線送到 1、2、3 號屋，貼上包裹再到終點。</span>
+        <span>畫線送到 1、2、3 號屋，再到終點。</span>
       </button>
       <button class="hub-card" type="button" @click="emit('pick', 'tooth')">
         <svg class="hub-art" viewBox="0 0 220 120" aria-hidden="true">

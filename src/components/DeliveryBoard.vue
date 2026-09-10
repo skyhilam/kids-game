@@ -16,13 +16,11 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   move: [to: string];
-  stamp: [];
   tracing: [to: string | null];
   feedback: [reason: RouteFailure | 'off-road' | 'start-at-truck'];
 }>();
 const surface = ref<SVGSVGElement | null>(null);
 const targetLayer = ref<HTMLElement | null>(null);
-const stampButton = ref<HTMLButtonElement | null>(null);
 const facing = ref(0);
 const { trace, position, onPointerDown, onPointerMove, onPointerUp, stopPointer } = useRouteTrace({
   surface, mission: () => props.mission, state: () => props.state,
@@ -74,7 +72,7 @@ function onKey(event: KeyboardEvent): void {
 watch([() => props.state.node, () => props.enabled], async () => {
   if (props.mode !== 'tap') return;
   await nextTick();
-  const next = props.state.pendingStamp ? stampButton.value : targetLayer.value?.querySelector('button');
+  const next = targetLayer.value?.querySelector('button');
   next?.focus({ preventScroll: true });
 });
 </script>
@@ -137,9 +135,6 @@ watch([() => props.state.node, () => props.enabled], async () => {
           <svg viewBox="0 0 32 32" aria-hidden="true" :style="{ rotate: `${heading(mission.nodes[state.node], mission.nodes[node])}deg` }"><use href="#i-arrow"/></svg>
         </button>
       </div>
-      <button v-if="state.pendingStamp" ref="stampButton" class="delivery-stamp-button" :style="percent(state.node)" @click="emit('stamp')">
-        <GameSprite name="parcel"/><span>貼包裹 ✓</span>
-      </button>
       <div class="delivery-map-note">同一路段只走一次</div>
     </div>
   </section>
