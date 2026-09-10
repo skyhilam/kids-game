@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LEVELS,
-  SHOP_ART,
   available,
   applyMove,
   createGame,
@@ -10,9 +8,12 @@ import {
   makeGraph,
   mapSize,
   roadKey,
-  shopArtOrigin,
   tryMove,
 } from '../src/game/rules';
+import { SHOP_ART, shopArtOrigin } from '../src/picnic/art';
+import { NODE_LABELS } from '../src/picnic/copy';
+import { LEVELS } from '../src/picnic/levels';
+import { TOOTH_LEVELS } from '../src/tooth/levels';
 import type { GameState, Graph, MoveResult, NodeId } from '../src/game/types';
 
 function play(graph: Graph, state: GameState, to: NodeId): MoveResult {
@@ -33,19 +34,25 @@ describe('picnic game rules (shipped logic)', () => {
     ]);
   });
 
-  it('gives every level a burger-then-park solution from the start', () => {
+  it('starts uncollected when a level has a collectible', () => {
+    expect(createGame(LEVELS).state.collected).toBe(false);
+    expect(createGame(TOOTH_LEVELS).state.collected).toBe(true);
+  });
+
+  it('gives every level a collect-then-goal solution from the start', () => {
     LEVELS.forEach((_, index) => {
-      const { graph, state } = createGame(index);
-      const path = findSolution(graph, state.node, state.burger, state.used);
+      const { graph, state } = createGame(LEVELS, index);
+      const path = findSolution(graph, state.node, state.collected, state.used);
       expect(path, graph.name).not.toBeNull();
       if (!path) return;
-      expect(path).toContain(graph.shop);
-      expect(path[path.length - 1]).toBe(graph.park);
+      expect(graph.collect).not.toBeNull();
+      expect(path).toContain(graph.collect);
+      expect(path[path.length - 1]).toBe(graph.goal);
     });
   });
 
   it('rejects reversing a used undirected road from a fresh start', () => {
-    const { graph, state } = createGame(0);
+    const { graph, state } = createGame(LEVELS);
     expect(roadKey(graph.start, 'a')).toBe(roadKey('a', graph.start));
     expect(roadKey(graph.start, 'a')).toBe('a-s');
 
@@ -68,47 +75,47 @@ describe('picnic game rules (shipped logic)', () => {
     expect(state.node).toBe('a');
   });
 
-  it('wins only by reaching the park after the burger shop', () => {
-    const { graph, state } = createGame(0);
+  it('wins only by reaching the goal after the collectible', () => {
+    const { graph, state } = createGame(LEVELS);
     expect(play(graph, state, 'a').ok).toBe(true);
-    expect(play(graph, state, graph.shop).ok).toBe(true);
-    expect(state.burger).toBe(true);
+    expect(play(graph, state, graph.collect!).ok).toBe(true);
+    expect(state.collected).toBe(true);
     expect(play(graph, state, 'b').ok).toBe(true);
-    const atPark = play(graph, state, graph.park);
-    expect(atPark.ok).toBe(true);
-    if (!atPark.ok) return;
-    expect(atPark.won).toBe(true);
+    const atGoal = play(graph, state, graph.goal);
+    expect(atGoal.ok).toBe(true);
+    if (!atGoal.ok) return;
+    expect(atGoal.won).toBe(true);
     expect(isWin(graph, state)).toBe(true);
-    expect(state.node).toBe(graph.park);
-    expect(state.burger).toBe(true);
+    expect(state.node).toBe(graph.goal);
+    expect(state.collected).toBe(true);
   });
 
-  it('does not treat park-without-burger as a win', () => {
-    const { graph, state } = createGame(1);
+  it('does not treat goal-without-collectible as a win', () => {
+    const { graph, state } = createGame(LEVELS, 1);
     expect(play(graph, state, 'a').ok).toBe(true);
     expect(play(graph, state, 'c').ok).toBe(true);
     expect(play(graph, state, 'd').ok).toBe(true);
-    const atPark = play(graph, state, graph.park);
-    expect(atPark.ok).toBe(true);
-    if (!atPark.ok) return;
-    expect(state.burger).toBe(false);
-    expect(atPark.won).toBe(false);
+    const atGoal = play(graph, state, graph.goal);
+    expect(atGoal.ok).toBe(true);
+    if (!atGoal.ok) return;
+    expect(state.collected).toBe(false);
+    expect(atGoal.won).toBe(false);
     expect(isWin(graph, state)).toBe(false);
-    expect(state.stalled).toBe('burger');
+    expect(state.stalled).toBe('missing-collect');
     expect(state.won).toBe(false);
   });
 
-  it('hint never recommends a used undirected edge or a park-without-burger path', () => {
-    const { graph, state } = createGame(1);
+  it('hint never recommends a used undirected edge or a goal-without-collectible path', () => {
+    const { graph, state } = createGame(LEVELS, 1);
     expect(play(graph, state, 'a').ok).toBe(true);
 
-    const path = findSolution(graph, state.node, state.burger, state.used);
+    const path = findSolution(graph, state.node, state.collected, state.used);
     expect(path).not.toBeNull();
     if (!path) return;
     expect(path.length).toBeGreaterThan(0);
 
     let node = state.node;
-    let burger = state.burger;
+    let collected = state.collected;
     const used = new Set(state.used);
     for (const next of path) {
       const edgeId = roadKey(node, next);
@@ -117,58 +124,93 @@ describe('picnic game rules (shipped logic)', () => {
       expect(link, `hint stepped to unreachable ${node}->${next}`).toBeTruthy();
       used.add(edgeId);
       node = next;
-      if (node === graph.shop) burger = true;
-      if (node === graph.park) {
-        expect(burger).toBe(true);
+      if (node === graph.collect) collected = true;
+      if (node === graph.goal) {
+        expect(collected).toBe(true);
       }
     }
-    expect(node).toBe(graph.park);
-    expect(burger).toBe(true);
-    if (!state.burger) expect(path).toContain(graph.shop);
+    expect(node).toBe(graph.goal);
+    expect(collected).toBe(true);
+    if (!state.collected) expect(path).toContain(graph.collect);
   });
 
-  it('findSolution returns null when only park-without-burger remains', () => {
-    const { graph, state } = createGame(1);
+  it('findSolution returns null when only goal-without-collectible remains', () => {
+    const { graph, state } = createGame(LEVELS, 1);
     expect(play(graph, state, 'a').ok).toBe(true);
-    expect(play(graph, state, graph.shop).ok).toBe(true);
+    expect(play(graph, state, graph.collect!).ok).toBe(true);
     expect(play(graph, state, 'b').ok).toBe(true);
-    expect(play(graph, state, graph.park).ok).toBe(true);
+    expect(play(graph, state, graph.goal).ok).toBe(true);
     expect(isWin(graph, state)).toBe(true);
+    expect(findSolution(graph, state.node, state.collected, state.used)).toEqual([]);
 
-    const trapped = createGame(1);
+    const trapped = createGame(LEVELS, 1);
     expect(play(trapped.graph, trapped.state, 'a').ok).toBe(true);
-    expect(play(trapped.graph, trapped.state, trapped.graph.shop).ok).toBe(true);
+    expect(play(trapped.graph, trapped.state, trapped.graph.collect!).ok).toBe(true);
     expect(play(trapped.graph, trapped.state, 'b').ok).toBe(true);
+    const trappedPath = findSolution(
+      trapped.graph,
+      trapped.state.node,
+      trapped.state.collected,
+      trapped.state.used,
+    );
+    expect(trappedPath).not.toBeNull();
+    if (!trappedPath) return;
+    expect(trappedPath[trappedPath.length - 1]).toBe(trapped.graph.goal);
 
-    const noShop = createGame(1);
-    expect(play(noShop.graph, noShop.state, 'a').ok).toBe(true);
-    expect(play(noShop.graph, noShop.state, 'c').ok).toBe(true);
-    expect(play(noShop.graph, noShop.state, 'd').ok).toBe(true);
-    const remaining = available(noShop.graph, noShop.state.node, noShop.state.used).map((l) => l.to);
-    expect(remaining).toContain(noShop.graph.park);
+    const noCollect = createGame(LEVELS, 1);
+    expect(play(noCollect.graph, noCollect.state, 'a').ok).toBe(true);
+    expect(play(noCollect.graph, noCollect.state, 'c').ok).toBe(true);
+    expect(play(noCollect.graph, noCollect.state, 'd').ok).toBe(true);
+    const remaining = available(noCollect.graph, noCollect.state.node, noCollect.state.used).map((l) => l.to);
+    expect(remaining).toContain(noCollect.graph.goal);
     const path = findSolution(
-      noShop.graph,
-      noShop.state.node,
-      noShop.state.burger,
-      noShop.state.used,
+      noCollect.graph,
+      noCollect.state.node,
+      noCollect.state.collected,
+      noCollect.state.used,
     );
     expect(path).toBeNull();
+  });
+
+  it('stalls a degree-1 arrival as deadend and blocks further moves', () => {
+    const { graph, state } = createGame(LEVELS, 2);
+    expect(play(graph, state, 'a').ok).toBe(true);
+    expect(play(graph, state, graph.collect!).ok).toBe(true);
+    expect(play(graph, state, 'b').ok).toBe(true);
+    expect(play(graph, state, 'u').ok).toBe(true);
+    const atEnd = play(graph, state, 'v');
+    expect(atEnd.ok).toBe(true);
+    if (!atEnd.ok) return;
+    expect(atEnd.stalled).toBe('deadend');
+    expect(state.stalled).toBe('deadend');
+    expect(tryMove(graph, state, 'u')).toEqual({ ok: false, reason: 'blocked' });
+  });
+
+  it('does not invent shop/park landmarks on picnic maps', () => {
+    LEVELS.forEach((level) => {
+      expect(level).not.toHaveProperty('shop');
+      expect(level).not.toHaveProperty('park');
+      expect(level.collect).toBeTruthy();
+      expect(level.hazards).toBeUndefined();
+    });
   });
 });
 
 describe('graph presentation contract', () => {
-  it('titles every node and keeps the shop sprite in the viewBox', () => {
+  it('titles every node from the theme and keeps the shop sprite in the viewBox', () => {
     expect(shopArtOrigin([435, 155])[1]).toBe(0);
     expect(shopArtOrigin([435, 345])[1]).toBe(345 - SHOP_ART.dy);
 
     LEVELS.forEach((_, index) => {
       for (const narrow of [false, true]) {
-        const graph = makeGraph(index, narrow);
+        const graph = makeGraph(LEVELS, index, narrow, NODE_LABELS);
         const size = mapSize(narrow);
         Object.keys(graph.nodes).forEach((id) => {
           expect(graph.titles[id], `${graph.name} ${id}`).toBeTruthy();
         });
-        const [x, y] = shopArtOrigin(graph.nodes[graph.shop]);
+        expect(graph.titles[graph.collect!]).toBe('漢堡店');
+        expect(graph.titles[graph.goal]).toBe('公園');
+        const [x, y] = shopArtOrigin(graph.nodes[graph.collect!]);
         expect(y).toBeGreaterThanOrEqual(0);
         expect(y + SHOP_ART.height).toBeLessThanOrEqual(size.height);
         expect(x + SHOP_ART.width).toBeGreaterThan(0);

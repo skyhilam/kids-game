@@ -1,7 +1,7 @@
 {
-  "name": "一起去野餐",
-  "short_name": "野餐",
-  "description": "3+ 歲親子小遊戲：點光圈開車，先買漢堡，再去公園野餐。",
+  "name": "小小出遊家",
+  "short_name": "出遊家",
+  "description": "3+ 歲親子迷宮：野餐、刷牙、送貨。觀察小路，同一路段只走一次。",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

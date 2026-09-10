@@ -5,9 +5,10 @@ export interface LevelDef {
   name: string;
   short: string;
   start: NodeId;
-  shop: NodeId;
-  park: NodeId;
+  goal: NodeId;
+  collect?: NodeId;
   tutorial?: boolean;
+  hazards?: NodeId[];
   nodes: Record<NodeId, Point>;
   edges: [NodeId, NodeId][];
 }
@@ -29,9 +30,10 @@ export interface Graph {
   name: string;
   short: string;
   start: NodeId;
-  shop: NodeId;
-  park: NodeId;
+  goal: NodeId;
+  collect: NodeId | null;
   tutorial: boolean;
+  hazards: NodeId[];
   titles: Record<NodeId, string>;
   deadends: NodeId[];
   nodes: Record<NodeId, Point>;
@@ -39,13 +41,15 @@ export interface Graph {
   adj: Record<NodeId, Link[]>;
 }
 
+export type StallReason = 'missing-collect' | 'deadend' | 'hazard';
+
 export interface GameState {
   level: number;
   node: NodeId;
-  burger: boolean;
+  collected: boolean;
   used: Set<string>;
   won: boolean;
-  stalled: false | 'burger' | 'deadend';
+  stalled: false | StallReason;
 }
 
 export type MoveFail = {
@@ -59,10 +63,10 @@ export type MoveOk = {
   to: NodeId;
   edgeId: string;
   reverse: boolean;
-  burger: boolean;
-  boughtNow: boolean;
+  collected: boolean;
+  collectedNow: boolean;
   won: boolean;
-  stalled: false | 'burger' | 'deadend';
+  stalled: false | StallReason;
 };
 
 export type MoveResult = MoveFail | MoveOk;
@@ -76,5 +80,5 @@ export type Overlay =
   | { kind: 'welcome' }
   | { kind: 'help' }
   | { kind: 'rescue' }
-  | { kind: 'stuck'; reason: 'burger' | 'deadend' }
+  | { kind: 'stuck'; reason: StallReason }
   | { kind: 'win' };

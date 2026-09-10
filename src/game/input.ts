@@ -1,26 +1,40 @@
 import { available } from './rules';
 import type { Graph, NodeId, Point } from './types';
 
+export function bestByVector<T>(
+  origin: Point,
+  candidates: readonly { to: T; point: Point }[],
+  vector: readonly [number, number],
+): { to: T; score: number } | undefined {
+  const [vx, vy] = vector;
+  const mag = Math.hypot(vx, vy);
+  if (mag === 0) return undefined;
+  const [x, y] = origin;
+  return candidates
+    .map((item) => {
+      const [nx, ny] = item.point;
+      const dx = nx - x;
+      const dy = ny - y;
+      const len = Math.hypot(dx, dy);
+      return { to: item.to, score: len === 0 ? 0 : (dx * vx + dy * vy) / (len * mag) };
+    })
+    .sort((a, b) => b.score - a.score)[0];
+}
+
 export function bestNeighbor(
   graph: Graph,
   from: NodeId,
   used: Set<string>,
   vector: readonly [number, number],
 ): { to: NodeId; score: number } | undefined {
-  const [vx, vy] = vector;
-  const mag = Math.hypot(vx, vy);
-  if (mag === 0) return undefined;
-  const origin = graph.nodes[from];
-  const [x, y] = origin;
-  return available(graph, from, used)
-    .map((link) => {
-      const [nx, ny] = graph.nodes[link.to];
-      const dx = nx - x;
-      const dy = ny - y;
-      const len = Math.hypot(dx, dy);
-      return { to: link.to, score: len === 0 ? 0 : (dx * vx + dy * vy) / (len * mag) };
-    })
-    .sort((a, b) => b.score - a.score)[0];
+  return bestByVector(
+    graph.nodes[from],
+    available(graph, from, used).map((link) => ({
+      to: link.to,
+      point: graph.nodes[link.to],
+    })),
+    vector,
+  );
 }
 
 export function nearestNeighbor(

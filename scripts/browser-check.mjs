@@ -13,9 +13,9 @@ function log(line) {
   console.log(line);
 }
 
-const ART_IDS = [
-  'art-bear', 'art-car', 'art-burger', 'art-shop', 'art-home',
-  'art-park', 'art-picnic', 'art-picnic-place', 'art-tree', 'art-flower',
+const PICNIC_ART = [
+  'bear', 'car', 'car-top', 'burger', 'shop', 'home',
+  'park', 'picnic-place', 'tree', 'flower', 'sun',
 ];
 const URL = 'http://127.0.0.1:4173/kids-game/';
 
@@ -37,33 +37,93 @@ function waitForServer() {
   });
 }
 
-async function runOnce(page, pass) {
-  const errors = [];
-  page.on('pageerror', (err) => errors.push(String(err)));
-  page.on('response', (res) => {
-    const url = res.url();
-    if (res.status() >= 400 && !url.includes('favicon')) {
-      errors.push(`${res.status()} ${url}`);
-    }
-  });
+async function spriteNames(page) {
+  return page.locator('[data-sprite]').evaluateAll((nodes) => nodes.map((node) => node.dataset.sprite));
+}
+
+async function openHub(page) {
   await page.goto(URL, { waitUntil: 'networkidle' });
   const title = await page.title();
-  if (!title.includes('一起去野餐')) throw new Error(`title was ${title}`);
+  if (!title.includes('小小出遊家')) throw new Error(`title was ${title}`);
+  await page.getByRole('heading', { name: '選擇遊戲' }).waitFor();
+  return title;
+}
+
+async function startPicnic(page) {
+  await page.getByRole('button', { name: '一起去野餐 先到漢堡店，再前往公園。' }).click();
   await page.waitForSelector('#startBtn');
-  const ids = await page.evaluate((want) => want.filter((id) => document.getElementById(id)), ART_IDS);
-  const missing = ART_IDS.filter((id) => !ids.includes(id));
-  if (missing.length) throw new Error(`missing art ids: ${missing.join(',')}`);
+  const names = await spriteNames(page);
+  const missing = PICNIC_ART.filter((name) => !names.includes(name));
+  if (missing.length) throw new Error(`missing picnic sprites: ${missing.join(',')}`);
   const boardBox = await page.locator('#board').boundingBox();
   if (!boardBox || boardBox.width < 200 || boardBox.height < 150) {
-    throw new Error(`board too small: ${JSON.stringify(boardBox)}`);
+    throw new Error(`picnic board too small: ${JSON.stringify(boardBox)}`);
   }
   await page.click('#startBtn');
   await page.waitForFunction(() => !document.querySelector('dialog')?.open);
   await page.waitForSelector('.step-target');
   const targets = await page.locator('.step-target').count();
-  if (targets < 1) throw new Error('no move targets after start');
+  if (targets < 1) throw new Error('no picnic move targets after start');
+  return { boardBox, targets };
+}
+
+async function goHome(page) {
+  await page.getByRole('button', { name: '選擇遊戲' }).click();
+  await page.getByRole('heading', { name: '選擇遊戲' }).waitFor();
+}
+
+async function runPicnicPass(page, pass) {
+  const errors = [];
+  const onError = (err) => errors.push(String(err));
+  const onResponse = (res) => {
+    const url = res.url();
+    if (res.status() >= 400 && !url.includes('favicon')) {
+      errors.push(`${res.status()} ${url}`);
+    }
+  };
+  page.on('pageerror', onError);
+  page.on('response', onResponse);
+  const title = await openHub(page);
+  const { boardBox, targets } = await startPicnic(page);
   if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`);
+  page.off('pageerror', onError);
+  page.off('response', onResponse);
   log(`pass ${pass}: title=${title} board=${Math.round(boardBox.width)}x${Math.round(boardBox.height)} targets=${targets} errors=0`);
+}
+
+async function runActivities(page) {
+  const errors = [];
+  page.on('pageerror', (err) => errors.push(String(err)));
+  await openHub(page);
+
+  await page.getByRole('button', { name: '打敗蛀牙蟲 走到終點，途中避開蛀牙蟲。' }).click();
+  await page.waitForSelector('#startBtn');
+  const toothSprites = await spriteNames(page);
+  for (const name of ['kid', 'tooth', 'bug-coral', 'toothbrush']) {
+    if (!toothSprites.includes(name)) throw new Error(`missing tooth sprite: ${name}`);
+  }
+  await page.click('#startBtn');
+  await page.waitForFunction(() => !document.querySelector('dialog')?.open);
+  await page.waitForSelector('.step-target');
+  if (await page.locator('.step-target').count() < 1) throw new Error('no tooth move targets after start');
+  await goHome(page);
+
+  await page.getByRole('button', { name: '送貨員來了 畫線送到 1、2、3 號屋，貼上包裹再到終點。' }).click();
+  await page.getByRole('button', { name: '開始送貨' }).waitFor();
+  const deliverySprites = await spriteNames(page);
+  for (const name of ['truck', 'truck-top', 'home']) {
+    if (!deliverySprites.includes(name)) throw new Error(`missing delivery sprite: ${name}`);
+  }
+  await page.getByRole('button', { name: '開始送貨' }).click();
+  await page.waitForFunction(() => !document.querySelector('dialog')?.open);
+  const deliveryBoard = await page.locator('.delivery-board').boundingBox();
+  if (!deliveryBoard || deliveryBoard.width < 200 || deliveryBoard.height < 150) {
+    throw new Error(`delivery board too small: ${JSON.stringify(deliveryBoard)}`);
+  }
+  await goHome(page);
+
+  if (errors.length) throw new Error(`activity errors: ${errors.join(' | ')}`);
+  log('activities: hub, tooth, delivery ok');
 }
 
 const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
@@ -78,9 +138,27 @@ try {
   await waitForServer();
   browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-  await runOnce(page, 1);
+  await runPicnicPass(page, 1);
   await page.screenshot({ path: join(outDir, 'game.png'), fullPage: true });
-  await runOnce(page, 2);
+  await runPicnicPass(page, 2);
+  await runActivities(page);
+
+  const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await openHub(mobile);
+  const { boardBox } = await startPicnic(mobile);
+  if (boardBox.width < 200) throw new Error(`mobile picnic board too small: ${JSON.stringify(boardBox)}`);
+  await goHome(mobile);
+  await mobile.getByRole('button', { name: '打敗蛀牙蟲' }).click();
+  await mobile.waitForSelector('#startBtn');
+  await mobile.click('#startBtn');
+  await mobile.waitForFunction(() => !document.querySelector('dialog')?.open);
+  await goHome(mobile);
+  await mobile.getByRole('button', { name: '送貨員來了' }).click();
+  await mobile.getByRole('button', { name: '開始送貨' }).click();
+  await mobile.waitForFunction(() => !document.querySelector('dialog')?.open);
+  await mobile.close();
+  log('mobile 390x844: hub, picnic, tooth, delivery ok');
+
   log('DONE both loads succeeded');
 } catch (err) {
   log(`FAILED: ${err instanceof Error ? err.stack || err.message : err}`);

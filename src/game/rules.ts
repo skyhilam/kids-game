@@ -1,20 +1,24 @@
-import { makeGraph } from './graph';
-import { LEVELS } from './levels';
-import type { GameState, Graph, Link, MoveOk, MoveResult, NodeId } from './types';
+import { makeGraph, type GraphLabels } from './graph';
+import type { GameState, Graph, LevelDef, Link, MoveOk, MoveResult, NodeId } from './types';
 
-export { LEVELS } from './levels';
-export { makeGraph, roadKey, mapSize, shopArtOrigin, SHOP_ART } from './graph';
-export type { GameState, Graph, Link, MoveResult, NodeId } from './types';
+export { makeGraph, roadKey, mapSize } from './graph';
+export type { GraphLabels } from './graph';
+export type { GameState, Graph, Link, MoveResult, NodeId, StallReason } from './types';
 
-export function createGame(levelIndex = 0, narrow = false): { graph: Graph; state: GameState } {
-  const level = Math.max(0, Math.min(levelIndex, LEVELS.length - 1));
-  const graph = makeGraph(level, narrow);
+export function createGame(
+  catalog: readonly LevelDef[],
+  levelIndex = 0,
+  narrow = false,
+  labels: GraphLabels = {},
+): { graph: Graph; state: GameState } {
+  const level = Math.max(0, Math.min(levelIndex, catalog.length - 1));
+  const graph = makeGraph(catalog, level, narrow, labels);
   return {
     graph,
     state: {
       level,
       node: graph.start,
-      burger: false,
+      collected: graph.collect === null,
       used: new Set(),
       won: false,
       stalled: false,
@@ -27,24 +31,26 @@ export function available(graph: Graph, node: NodeId, used: Set<string>): Link[]
 }
 
 /**
- * Exhaustive search over this small graph. It never recommends a reused road,
- * and reaching the park without a burger is not a solution.
+ * Exhaustive search over this small graph. It never recommends a reused road
+ * or a hazard, and reaching the goal without the collectible is not a solution.
  */
 export function findSolution(
   graph: Graph,
   node: NodeId,
-  burger: boolean,
+  collected: boolean,
   used: Set<string>,
 ): NodeId[] | null {
   const failed = new Set<string>();
-  const search = (n: NodeId, hasBurger: boolean, mask: number): NodeId[] | null => {
-    if (n === graph.park) return hasBurger ? [] : null;
-    const key = `${n}/${hasBurger ? 1 : 0}/${mask}`;
+  const search = (n: NodeId, hasCollect: boolean, mask: number): NodeId[] | null => {
+    if (n === graph.goal) return hasCollect ? [] : null;
+    const key = `${n}/${hasCollect ? 1 : 0}/${mask}`;
     if (failed.has(key)) return null;
     for (const link of graph.adj[n]) {
       const bit = 1 << link.edge.index;
       if (mask & bit) continue;
-      const result = search(link.to, hasBurger || link.to === graph.shop, mask | bit);
+      if (graph.hazards.includes(link.to)) continue;
+      const nextCollect = hasCollect || (graph.collect !== null && link.to === graph.collect);
+      const result = search(link.to, nextCollect, mask | bit);
       if (result !== null) return [link.to, ...result];
     }
     failed.add(key);
@@ -54,7 +60,7 @@ export function findSolution(
   graph.edges.forEach((e) => {
     if (used.has(e.id)) mask |= 1 << e.index;
   });
-  return search(node, burger, mask);
+  return search(node, collected, mask);
 }
 
 export function tryMove(graph: Graph, state: GameState, to: NodeId): MoveResult {
@@ -66,45 +72,52 @@ export function tryMove(graph: Graph, state: GameState, to: NodeId): MoveResult 
 
   const from = state.node;
   const reverse = adjacent.edge.a !== from;
-  const boughtNow = to === graph.shop && !state.burger;
-  const burger = state.burger || boughtNow;
+  const collectedNow = graph.collect !== null && to === graph.collect && !state.collected;
+  const collected = state.collected || collectedNow;
   const used = new Set(state.used);
   used.add(adjacent.edge.id);
 
-  if (to === graph.park) {
-    if (burger) {
+  if (graph.hazards.includes(to)) {
+    return {
+      ok: true, from, to, edgeId: adjacent.edge.id, reverse,
+      collected, collectedNow, won: false, stalled: 'hazard',
+    };
+  }
+
+  if (to === graph.goal) {
+    if (collected) {
       return {
         ok: true, from, to, edgeId: adjacent.edge.id, reverse,
-        burger, boughtNow, won: true, stalled: false,
+        collected, collectedNow, won: true, stalled: false,
       };
     }
     return {
       ok: true, from, to, edgeId: adjacent.edge.id, reverse,
-      burger, boughtNow, won: false, stalled: 'burger',
+      collected, collectedNow, won: false, stalled: 'missing-collect',
     };
   }
 
   if (!available(graph, to, used).length) {
     return {
       ok: true, from, to, edgeId: adjacent.edge.id, reverse,
-      burger, boughtNow, won: false, stalled: 'deadend',
+      collected, collectedNow, won: false, stalled: 'deadend',
     };
   }
 
   return {
     ok: true, from, to, edgeId: adjacent.edge.id, reverse,
-    burger, boughtNow, won: false, stalled: false,
+    collected, collectedNow, won: false, stalled: false,
   };
 }
 
 export function applyMove(state: GameState, move: MoveOk): void {
   state.used.add(move.edgeId);
   state.node = move.to;
-  state.burger = move.burger;
+  state.collected = move.collected;
   state.won = move.won;
   state.stalled = move.stalled;
 }
 
 export function isWin(graph: Graph, state: GameState): boolean {
-  return state.won === true && state.node === graph.park && state.burger === true;
+  return state.won === true && state.node === graph.goal && state.collected === true;
 }

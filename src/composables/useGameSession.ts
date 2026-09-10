@@ -1,13 +1,7 @@
 import { computed, getCurrentInstance, onUnmounted, reactive, ref, shallowRef } from 'vue';
-import {
-  ARRIVAL_GUIDE,
-  HINT_GUIDE,
-  arrivalKind,
-  startGuide,
-} from '../game/copy';
+import type { SessionCopy } from '../game/copy';
 import { clamp, heading, moveDuration } from '../game/motion';
 import {
-  LEVELS,
   applyMove,
   createGame,
   findSolution,
@@ -18,62 +12,66 @@ import type {
   GameState,
   Graph,
   InFlightMove,
+  LevelDef,
   MoveOk,
   MoveResult,
   NodeId,
   Overlay,
 } from '../game/types';
 
+export type { SessionCopy };
+
 const reduceMotion = typeof window !== 'undefined'
   && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function useGameSession(hooks: {
   onSettled?: (result: MoveOk) => void;
-} = {}) {
+} = {}, options: {
+  catalog: readonly LevelDef[];
+  copy: SessionCopy;
+}) {
+  const catalog = options.catalog;
+  const copy = options.copy;
   const narrow = ref(typeof window !== 'undefined' && window.innerWidth <= 600);
-  const fresh = createGame(0, narrow.value);
+  const fresh = createGame(catalog, 0, narrow.value, copy.labels);
   const graph = shallowRef<Graph>(fresh.graph);
   const game = reactive<GameState>(fresh.state);
   const overlay = ref<Overlay | null>({ kind: 'welcome' });
   const inFlight = ref<InFlightMove | null>(null);
   const facing = ref(90);
   const hintNode = ref<NodeId | null>(null);
-  const pickupVisible = ref(false);
   const completed = ref(new Set<number>());
   const epoch = ref(0);
   const started = ref(false);
-  const opening = startGuide(fresh.graph, fresh.state.level);
+  const opening = copy.startGuide(fresh.graph, fresh.state.level);
   const guideMain = ref(opening.main);
   const guideSub = ref(opening.sub);
   const announce = ref(opening.announce);
-  let pickupTimer = 0;
   let layoutTimer = 0;
 
   const interactive = computed(
     () => overlay.value === null && inFlight.value === null,
   );
-  const lastLevel = computed(() => game.level === LEVELS.length - 1);
-  const allDone = computed(() => completed.value.size === LEVELS.length);
+  const lastLevel = computed(() => game.level === catalog.length - 1);
+  const allDone = computed(() => completed.value.size === catalog.length);
   const wrapTour = computed(() => lastLevel.value || allDone.value);
 
   function applyStartGuide(): void {
-    const copy = startGuide(graph.value, game.level);
-    guideMain.value = copy.main;
-    guideSub.value = copy.sub;
-    announce.value = copy.announce;
+    const nextCopy = copy.startGuide(graph.value, game.level);
+    guideMain.value = nextCopy.main;
+    guideSub.value = nextCopy.sub;
+    announce.value = nextCopy.announce;
   }
 
   function loadLevel(index: number, opts: { hint?: boolean } = {}): void {
     epoch.value += 1;
-    window.clearTimeout(pickupTimer);
-    const next = createGame(index, narrow.value);
+    const next = createGame(catalog, index, narrow.value, copy.labels);
     graph.value = next.graph;
     Object.assign(game, next.state);
     inFlight.value = null;
-    pickupVisible.value = false;
     facing.value = 90;
     hintNode.value = opts.hint
-      ? findSolution(next.graph, next.state.node, next.state.burger, next.state.used)?.[0] ?? null
+      ? findSolution(next.graph, next.state.node, next.state.collected, next.state.used)?.[0] ?? null
       : null;
     applyStartGuide();
     applyLayout();
@@ -119,11 +117,6 @@ export function useGameSession(hooks: {
     return true;
   }
 
-  function flashPickup(): void {
-    pickupVisible.value = true;
-    pickupTimer = window.setTimeout(() => { pickupVisible.value = false; }, 2300);
-  }
-
   function requestMove(to: NodeId): MoveResult {
     if (!interactive.value) return { ok: false, reason: 'blocked' };
     const result = tryMove(graph.value, game, to);
@@ -131,8 +124,6 @@ export function useGameSession(hooks: {
 
     const currentEpoch = epoch.value;
     hintNode.value = null;
-    pickupVisible.value = false;
-    window.clearTimeout(pickupTimer);
 
     const fromPt = graph.value.nodes[result.from];
     const toPt = graph.value.nodes[result.to];
@@ -153,7 +144,6 @@ export function useGameSession(hooks: {
       }
       applyMove(game, result);
       facing.value = targetAngle;
-      if (result.boughtNow) flashPickup();
       if (result.won) {
         const nextCompleted = new Set(completed.value);
         nextCompleted.add(game.level);
@@ -163,9 +153,9 @@ export function useGameSession(hooks: {
         overlay.value = { kind: 'stuck', reason: result.stalled };
       }
       inFlight.value = null;
-      const copy = ARRIVAL_GUIDE[arrivalKind(graph.value, result, game.used)];
-      guideMain.value = copy.main;
-      guideSub.value = copy.sub;
+      const arrived = copy.arrivalGuide(graph.value, result, game.used);
+      guideMain.value = arrived.main;
+      guideSub.value = arrived.sub;
       hooks.onSettled?.(result);
     };
     requestAnimationFrame(frame);
@@ -174,12 +164,12 @@ export function useGameSession(hooks: {
 
   function requestHint(): 'hint' | 'rescue' | 'blocked' {
     if (!interactive.value) return 'blocked';
-    const path = findSolution(graph.value, game.node, game.burger, game.used);
+    const path = findSolution(graph.value, game.node, game.collected, game.used);
     if (path && path.length) {
       hintNode.value = path[0];
-      const copy = game.burger ? HINT_GUIDE.park : HINT_GUIDE.shop;
-      guideMain.value = copy.main;
-      guideSub.value = copy.sub;
+      const hint = copy.hintGuide(game.collected);
+      guideMain.value = hint.main;
+      guideSub.value = hint.sub;
       return 'hint';
     }
     overlay.value = { kind: 'rescue' };
@@ -213,13 +203,12 @@ export function useGameSession(hooks: {
       return;
     }
     narrow.value = next;
-    graph.value = makeGraph(game.level, next);
+    graph.value = makeGraph(catalog, game.level, next, copy.labels);
   }
 
   if (getCurrentInstance()) {
     onUnmounted(() => {
       epoch.value += 1;
-      window.clearTimeout(pickupTimer);
       window.clearTimeout(layoutTimer);
     });
   }
@@ -232,7 +221,6 @@ export function useGameSession(hooks: {
     inFlight,
     facing,
     hintNode,
-    pickupVisible,
     completed,
     interactive,
     lastLevel,
@@ -254,5 +242,6 @@ export function useGameSession(hooks: {
     showHelp,
     dismissOverlay,
     applyLayout,
+    catalog,
   };
 }
