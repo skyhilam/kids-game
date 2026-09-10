@@ -79,17 +79,6 @@ async function waitPlayable(page) {
   await page.waitForSelector('.step-target');
 }
 
-async function jumpToNamedLevel(page, name, badge) {
-  await page.click('button[aria-label="遊戲說明與關卡選擇"]');
-  await page.getByRole('heading', { name: '遊戲說明' }).waitFor();
-  await page.getByRole('button', { name: new RegExp(name) }).click();
-  await page.waitForFunction((text) => {
-    const badgeText = document.querySelector('.level-badge')?.textContent || '';
-    const hint = document.querySelector('.action-button.hint');
-    return !document.querySelector('dialog')?.open && badgeText.includes(text) && Boolean(hint) && !hint.disabled;
-  }, badge);
-}
-
 async function followHintsToWin(page) {
   await waitPlayable(page);
   for (let i = 0; i < 24; i += 1) {
@@ -110,22 +99,33 @@ async function followHintsToWin(page) {
   throw new Error('did not reach a win with hints');
 }
 
-async function playThroughGenerated(page, lastName, lastBadge, generatedLabel) {
-  await jumpToNamedLevel(page, lastName, lastBadge);
+async function mapFingerprint(page) {
+  return page.evaluate(() => [...document.querySelectorAll('.road-center')]
+    .map((path) => path.getAttribute('d'))
+    .join(';'));
+}
+
+async function playFromFirstMap(page) {
+  await waitPlayable(page);
+  const badge = await page.locator('.level-badge').innerText();
+  if (!badge.includes('第 1 關')) throw new Error(`expected 第 1 關, got ${badge}`);
+  if (await page.locator('.level-dots').count()) throw new Error('endless maps should not show finite level dots');
+  const fingerprint = await mapFingerprint(page);
+  await page.click('button[aria-label="遊戲說明與關卡選擇"]');
+  await page.getByRole('heading', { name: '遊戲說明' }).waitFor();
+  if (await page.locator('.help-levels').count()) {
+    throw new Error('help should not list fixed opening maps');
+  }
+  await page.click('#backToGame');
+  await waitPlayable(page);
   await followHintsToWin(page);
   const nextLabel = await page.locator('#nextBtn').innerText();
   if (!nextLabel.includes('下一關')) throw new Error(`expected 下一關, got ${nextLabel}`);
   await page.click('#nextBtn');
   await waitPlayable(page);
-  const badge = await page.locator('.level-badge').innerText();
-  if (!badge.includes(generatedLabel)) throw new Error(`badge was ${badge}`);
-  if (await page.locator('.level-dots').count()) throw new Error('endless maps should not show finite level dots');
-  await followHintsToWin(page);
-  await page.click('#nextBtn');
-  await waitPlayable(page);
   const later = await page.locator('.level-badge').innerText();
-  const laterNumber = Number.parseInt(generatedLabel.replace(/[^\d]/g, ''), 10) + 1;
-  if (!later.includes(`第 ${laterNumber} 關`)) throw new Error(`second generated badge was ${later}`);
+  if (!later.includes('第 2 關')) throw new Error(`second map badge was ${later}`);
+  return fingerprint;
 }
 
 async function goHome(page) {
@@ -205,25 +205,31 @@ try {
   const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
   await runPicnicPass(page, 1);
   await page.screenshot({ path: join(outDir, 'game.png'), fullPage: true });
-  await playThroughGenerated(page, '盡頭探險', '第 6 關', '第 7 關');
+  const picnicFirst = await playFromFirstMap(page);
   await page.screenshot({ path: join(outDir, 'picnic-generated.png'), fullPage: true });
-  log('desktop picnic: generated maps 7 then 8 playable');
+  log('desktop picnic: first map then 第 2 關 playable');
   await goHome(page);
   await runPicnicPass(page, 2);
+  const picnicSecond = await playFromFirstMap(page);
+  if (!picnicFirst || picnicFirst === picnicSecond) {
+    throw new Error('reopening picnic should shuffle the first map');
+  }
+  log('desktop picnic: reopening shuffled the first map');
+  await goHome(page);
   await runActivities(page);
   await page.getByRole('button', { name: '打敗蛀牙蟲 走到終點，途中避開蛀牙蟲。' }).click();
   await page.click('#startBtn');
   await waitPlayable(page);
-  await playThroughGenerated(page, '同一條路一次', '第 3 關', '第 4 關');
+  await playFromFirstMap(page);
   await page.screenshot({ path: join(outDir, 'tooth-generated.png'), fullPage: true });
-  log('desktop tooth: generated maps 4 then 5 playable');
+  log('desktop tooth: first map then 第 2 關 playable');
   await goHome(page);
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await openHub(mobile);
   const { boardBox } = await startPicnic(mobile);
   if (boardBox.width < 200) throw new Error(`mobile picnic board too small: ${JSON.stringify(boardBox)}`);
-  await playThroughGenerated(mobile, '盡頭探險', '第 6 關', '第 7 關');
+  await playFromFirstMap(mobile);
   await mobile.screenshot({ path: join(outDir, 'picnic-generated-mobile.png'), fullPage: true });
   await goHome(mobile);
   await mobile.getByRole('button', { name: '打敗蛀牙蟲' }).click();

@@ -27,11 +27,11 @@ function toothSession(hooks: { onSettled?: (result: MoveOk) => void } = {}) {
 }
 
 function endlessPicnic(hooks: { onSettled?: (result: MoveOk) => void } = {}) {
-  return useGameSession(hooks, { catalog: picnicLevel, picks: LEVELS, copy: picnicCopy });
+  return useGameSession(hooks, { catalog: picnicLevel, copy: picnicCopy });
 }
 
 function endlessTooth() {
-  return useGameSession({}, { catalog: toothLevel, picks: TOOTH_LEVELS, copy: toothCopy });
+  return useGameSession({}, { catalog: toothLevel, copy: toothCopy });
 }
 
 let rafQueue: FrameRequestCallback[] = [];
@@ -357,35 +357,49 @@ describe('game session (two-axis overlay)', () => {
     flushFrames();
   });
 
+  it('uses a new shuffle of generated picnic maps per catalog seed', () => {
+    const a = useGameSession({}, { catalog: (index) => picnicLevel(index, 1), copy: picnicCopy });
+    const b = useGameSession({}, { catalog: (index) => picnicLevel(index, 99), copy: picnicCopy });
+    a.welcomeStart();
+    b.welcomeStart();
+    expect({
+      start: a.graph.value.start,
+      collect: a.graph.value.collect,
+      goal: a.graph.value.goal,
+      edges: a.graph.value.edges.map((edge) => edge.id),
+    }).not.toEqual({
+      start: b.graph.value.start,
+      collect: b.graph.value.collect,
+      goal: b.graph.value.goal,
+      edges: b.graph.value.edges.map((edge) => edge.id),
+    });
+  });
+
   it('keeps minting picnic maps instead of wrapping the tour', () => {
     const session = endlessPicnic();
     expect(session.endless).toBe(true);
+    expect(session.helpLevels.value).toEqual([]);
     session.welcomeStart();
-    session.showHelp();
-    expect(session.jump(LEVELS.length - 1)).toBe(true);
     followSolution(session);
     expect(session.overlay.value).toEqual({ kind: 'win' });
     expect(session.lastLevel.value).toBe(false);
     expect(session.wrapTour.value).toBe(false);
     expect(session.next()).toBe(true);
-    expect(session.game.level).toBe(LEVELS.length);
+    expect(session.game.level).toBe(1);
     expect(session.graph.value.collect).toBeTruthy();
-    expect(session.helpLevels.value).toHaveLength(LEVELS.length + 1);
-    expect(session.helpLevels.value.at(-1)?.index).toBe(LEVELS.length);
+    expect(session.graph.value.tutorial).toBe(false);
     followSolution(session);
     expect(session.next()).toBe(true);
-    expect(session.game.level).toBe(LEVELS.length + 1);
+    expect(session.game.level).toBe(2);
   });
 
-  it('keeps minting tooth maps after the opening set', () => {
+  it('keeps minting tooth maps from the first generated map', () => {
     const session = endlessTooth();
     expect(session.endless).toBe(true);
     session.welcomeStart();
-    session.showHelp();
-    expect(session.jump(TOOTH_LEVELS.length - 1)).toBe(true);
     followSolution(session);
     expect(session.next()).toBe(true);
-    expect(session.game.level).toBe(TOOTH_LEVELS.length);
+    expect(session.game.level).toBe(1);
     expect(session.graph.value.hazards.length).toBeGreaterThan(0);
     followSolution(session);
     expect(session.game.won).toBe(true);
@@ -575,6 +589,8 @@ describe('dialog wiring', () => {
     expect(toothPlay).toMatch(/#rescue-hero/);
     expect(picnicPlay).not.toContain('蛀牙蟲');
     expect(toothPlay).not.toContain('漢堡');
+    expect(picnicPlay).toMatch(/picnicCatalog\(\)/);
+    expect(toothPlay).toMatch(/toothCatalog\(\)/);
     expect(picnicPlay).toMatch(/class="age-pill"/);
     expect(toothPlay).toMatch(/class="tooth-game"/);
   });

@@ -1,4 +1,4 @@
-import { generateMaze } from '../game/generate';
+import { generateMaze, randomSeed } from '../game/generate';
 import type { LevelDef } from '../game/types';
 
 export const LEVELS: readonly LevelDef[] = [
@@ -59,7 +59,12 @@ export const LEVELS: readonly LevelDef[] = [
   },
 ];
 
-export function picnicLevel(index: number): LevelDef {
-  if (index < LEVELS.length) return LEVELS[index]!;
-  return generateMaze('picnic', index);
+export function picnicLevel(index: number, seed = 0): LevelDef {
+  const level = generateMaze('picnic', index, seed);
+  return index === 0 ? { ...level, tutorial: true } : level;
+}
+
+/** One random shuffle per call; the same index stays the same map until remount. */
+export function picnicCatalog(seed = randomSeed()): (index: number) => LevelDef {
+  return (index) => picnicLevel(index, seed);
 }

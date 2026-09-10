@@ -1,4 +1,4 @@
-import { generateMaze } from '../game/generate';
+import { generateMaze, randomSeed } from '../game/generate';
 import type { LevelDef } from '../game/types';
 
 export const TOOTH_LEVELS: readonly LevelDef[] = [
@@ -45,7 +45,12 @@ export const TOOTH_LEVELS: readonly LevelDef[] = [
   },
 ];
 
-export function toothLevel(index: number): LevelDef {
-  if (index < TOOTH_LEVELS.length) return TOOTH_LEVELS[index]!;
-  return generateMaze('tooth', index);
+export function toothLevel(index: number, seed = 0): LevelDef {
+  const level = generateMaze('tooth', index, seed);
+  return index === 0 ? { ...level, tutorial: true } : level;
+}
+
+/** One random shuffle per call; the same index stays the same map until remount. */
+export function toothCatalog(seed = randomSeed()): (index: number) => LevelDef {
+  return (index) => toothLevel(index, seed);
 }

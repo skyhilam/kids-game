@@ -96,7 +96,7 @@ const revealMs = computed(() => {
         <h3>操作</h3>
         <p v-html="copy.help.controls"></p>
       </div>
-      <div class="help-section" style="border:0">
+      <div v-if="helpLevels.length" class="help-section" style="border:0">
         <h3>選擇關卡</h3>
         <div class="help-levels">
           <button

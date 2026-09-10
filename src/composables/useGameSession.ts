@@ -6,7 +6,6 @@ import {
   createGame,
   findSolution,
   isLevelFn,
-  levelAt,
   makeGraph,
   tryMove,
 } from '../game/rules';
@@ -61,13 +60,7 @@ export function useGameSession(hooks: {
   const lastLevel = computed(() => !endless && game.level === picks.length - 1);
   const allDone = computed(() => !endless && completed.value.size === picks.length);
   const wrapTour = computed(() => !endless && (lastLevel.value || allDone.value));
-  const helpLevels = computed(() => {
-    const items = picks.map((level, index) => ({ index, level }));
-    if (endless && game.level >= picks.length) {
-      items.push({ index: game.level, level: levelAt(catalog, game.level) });
-    }
-    return items;
-  });
+  const helpLevels = computed(() => picks.map((level, index) => ({ index, level })));
 
   function applyStartGuide(): void {
     const nextCopy = copy.startGuide(graph.value, game.level);

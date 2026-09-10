@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { confettiPalette, overlayCopy, sessionCopy, speech } from '../picnic/copy';
-import { LEVELS, picnicLevel } from '../picnic/levels';
+import { picnicCatalog } from '../picnic/levels';
 import GameSprite from './GameSprite.vue';
 import MazePlay from './MazePlay.vue';
 import PicnicBoard from './PicnicBoard.vue';
@@ -8,12 +8,13 @@ import PicnicBoard from './PicnicBoard.vue';
 defineEmits<{
   home: [];
 }>();
+
+const catalog = picnicCatalog();
 </script>
 
 <template>
   <MazePlay
-    :catalog="picnicLevel"
-    :picks="LEVELS"
+    :catalog="catalog"
     :copy="sessionCopy"
     :overlay-copy="overlayCopy"
     :speech="speech"

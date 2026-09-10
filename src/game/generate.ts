@@ -64,6 +64,7 @@ function hypot(a: Point, b: Point): number {
 
 function gridFor(kind: MazeKind, index: number, rand: () => number): Grid {
   const roll = rand();
+  if (index === 0) return GRID_3x2;
   if (index < 8) return roll < 0.42 ? GRID_3x2 : GRID_3x3;
   if (kind === 'picnic' && roll > 0.7) return GRID_4x3;
   if (kind === 'tooth' && roll > 0.78) return GRID_4x3;
@@ -169,8 +170,26 @@ function fallback(kind: MazeKind, index: number): LevelDef {
   };
 }
 
-function attempt(kind: MazeKind, index: number, attemptNo: number): LevelDef | null {
-  const rand = mulberry32((index + 1) * 10007 + (kind === 'picnic' ? 17 : 41) + attemptNo * 997);
+export function randomSeed(): number {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint32Array(1);
+    crypto.getRandomValues(bytes);
+    return bytes[0]!;
+  }
+  return (Math.random() * 0x100000000) >>> 0;
+}
+
+function mixSeed(seed: number, index: number, kind: MazeKind, attemptNo: number): number {
+  return (
+    Math.imul(seed >>> 0, 2246822519)
+    + (index + 1) * 10007
+    + (kind === 'picnic' ? 17 : 41)
+    + attemptNo * 997
+  ) >>> 0;
+}
+
+function attempt(kind: MazeKind, index: number, attemptNo: number, seed: number): LevelDef | null {
+  const rand = mulberry32(mixSeed(seed, index, kind, attemptNo));
   const grid = gridFor(kind, index, rand);
   const nodes: Record<NodeId, Point> = {};
   const ids: string[] = [];
@@ -244,9 +263,9 @@ function attempt(kind: MazeKind, index: number, attemptNo: number): LevelDef | n
   return valid(level, 'tooth') ? level : null;
 }
 
-export function generateMaze(kind: MazeKind, index: number): LevelDef {
+export function generateMaze(kind: MazeKind, index: number, seed = 0): LevelDef {
   for (let i = 0; i < 64; i += 1) {
-    const level = attempt(kind, index, i);
+    const level = attempt(kind, index, i, seed);
     if (level) return level;
   }
   return fallback(kind, index);
