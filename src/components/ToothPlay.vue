@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { confettiPalette, overlayCopy, sessionCopy, speech } from '../tooth/copy';
-import { TOOTH_LEVELS } from '../tooth/levels';
+import { TOOTH_LEVELS, toothLevel } from '../tooth/levels';
 import GameSprite from './GameSprite.vue';
 import MazePlay from './MazePlay.vue';
 import ToothBoard from './ToothBoard.vue';
@@ -13,7 +13,8 @@ defineEmits<{
 <template>
   <div class="tooth-game">
     <MazePlay
-      :catalog="TOOTH_LEVELS"
+      :catalog="toothLevel"
+      :picks="TOOTH_LEVELS"
       :copy="sessionCopy"
       :overlay-copy="overlayCopy"
       :speech="speech"

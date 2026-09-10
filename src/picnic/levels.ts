@@ -1,3 +1,4 @@
+import { generateMaze } from '../game/generate';
 import type { LevelDef } from '../game/types';
 
 export const LEVELS: readonly LevelDef[] = [
@@ -57,3 +58,8 @@ export const LEVELS: readonly LevelDef[] = [
     edges: [['s','a'],['a','h'],['h','b'],['b','p'],['a','c'],['c','d'],['d','h'],['d','p'],['b','u'],['u','v'],['s','w'],['c','x'],['h','u']],
   },
 ];
+
+export function picnicLevel(index: number): LevelDef {
+  if (index < LEVELS.length) return LEVELS[index]!;
+  return generateMaze('picnic', index);
+}

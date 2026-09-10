@@ -9,8 +9,9 @@ const props = defineProps<{
   level: number;
   lastLevel: boolean;
   allDone: boolean;
+  endless?: boolean;
   reduceMotion: boolean;
-  catalog: readonly LevelDef[];
+  helpLevels: readonly { index: number; level: LevelDef }[];
   copy: OverlayCopy;
 }>();
 
@@ -26,7 +27,7 @@ const emit = defineEmits<{
 }>();
 
 const stuckReason = computed(() => (props.overlay?.kind === 'stuck' ? props.overlay.reason : 'deadend'));
-const wrapTour = computed(() => props.lastLevel || props.allDone);
+const wrapTour = computed(() => !props.endless && (props.lastLevel || props.allDone));
 const cancelable = computed(() => props.overlay?.kind === 'help' || props.overlay?.kind === 'rescue');
 const revealMs = computed(() => {
   if (props.overlay?.kind !== 'win') return 0;
@@ -51,7 +52,7 @@ const revealMs = computed(() => {
       <div class="rule-note"><svg viewBox="0 0 28 28"><use href="#i-once"/></svg>同一路段僅可通行一次</div>
       <button class="primary-button" id="startBtn" autofocus @click="emit('start')">開始遊戲<svg><use href="#i-arrow"/></svg></button>
       <button class="secondary-button" type="button" @click="emit('home')">選擇遊戲</button>
-      <div class="dialog-footnote">{{ catalog.length }} 個關卡 · 輕觸即可遊玩 · 不計時</div>
+      <div class="dialog-footnote">{{ endless ? '一路玩下去' : `${helpLevels.length} 個關卡` }} · 輕觸即可遊玩 · 不計時</div>
     </div>
 
     <div v-else-if="overlay?.kind === 'stuck'" class="dialog-inner">
@@ -99,15 +100,15 @@ const revealMs = computed(() => {
         <h3>選擇關卡</h3>
         <div class="help-levels">
           <button
-            v-for="(item, i) in catalog"
-            :key="item.name"
+            v-for="item in helpLevels"
+            :key="item.index"
             class="help-level"
-            :class="{ selected: i === level }"
-            :data-level="i"
-            @click="emit('jump', i)"
+            :class="{ selected: item.index === level }"
+            :data-level="item.index"
+            @click="emit('jump', item.index)"
           >
-            {{ i + 1 }} · {{ item.short }}
-            <small>{{ item.name }}</small>
+            {{ item.index + 1 }} · {{ item.level.short }}
+            <small>{{ item.level.name }}</small>
           </button>
         </div>
       </div>

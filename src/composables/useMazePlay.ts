@@ -9,7 +9,7 @@ import {
   suspendAudio,
 } from '../game/audio';
 import type { SessionCopy } from '../game/copy';
-import type { LevelDef, MoveOk, NodeId, StallReason } from '../game/types';
+import type { LevelDef, LevelSource, MoveOk, NodeId, StallReason } from '../game/types';
 import { useGameSession } from './useGameSession';
 
 export type MazeSpeech = {
@@ -22,7 +22,8 @@ export type MazeSpeech = {
 };
 
 export function useMazePlay(options: {
-  catalog: readonly LevelDef[];
+  catalog: LevelSource;
+  picks?: readonly LevelDef[];
   copy: SessionCopy;
   speech: MazeSpeech;
   confettiPalette: readonly string[];
@@ -53,6 +54,7 @@ export function useMazePlay(options: {
 
   const session = useGameSession({ onSettled }, {
     catalog: options.catalog,
+    picks: options.picks,
     copy: options.copy,
   });
 

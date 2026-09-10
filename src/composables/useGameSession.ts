@@ -5,6 +5,8 @@ import {
   applyMove,
   createGame,
   findSolution,
+  isLevelFn,
+  levelAt,
   makeGraph,
   tryMove,
 } from '../game/rules';
@@ -13,6 +15,7 @@ import type {
   Graph,
   InFlightMove,
   LevelDef,
+  LevelSource,
   MoveOk,
   MoveResult,
   NodeId,
@@ -27,10 +30,13 @@ const reduceMotion = typeof window !== 'undefined'
 export function useGameSession(hooks: {
   onSettled?: (result: MoveOk) => void;
 } = {}, options: {
-  catalog: readonly LevelDef[];
+  catalog: LevelSource;
+  picks?: readonly LevelDef[];
   copy: SessionCopy;
 }) {
   const catalog = options.catalog;
+  const endless = isLevelFn(catalog);
+  const picks: readonly LevelDef[] = options.picks ?? (isLevelFn(catalog) ? [] : catalog);
   const copy = options.copy;
   const narrow = ref(typeof window !== 'undefined' && window.innerWidth <= 600);
   const fresh = createGame(catalog, 0, narrow.value, copy.labels);
@@ -52,9 +58,16 @@ export function useGameSession(hooks: {
   const interactive = computed(
     () => overlay.value === null && inFlight.value === null,
   );
-  const lastLevel = computed(() => game.level === catalog.length - 1);
-  const allDone = computed(() => completed.value.size === catalog.length);
-  const wrapTour = computed(() => lastLevel.value || allDone.value);
+  const lastLevel = computed(() => !endless && game.level === picks.length - 1);
+  const allDone = computed(() => !endless && completed.value.size === picks.length);
+  const wrapTour = computed(() => !endless && (lastLevel.value || allDone.value));
+  const helpLevels = computed(() => {
+    const items = picks.map((level, index) => ({ index, level }));
+    if (endless && game.level >= picks.length) {
+      items.push({ index: game.level, level: levelAt(catalog, game.level) });
+    }
+    return items;
+  });
 
   function applyStartGuide(): void {
     const nextCopy = copy.startGuide(graph.value, game.level);
@@ -226,6 +239,8 @@ export function useGameSession(hooks: {
     lastLevel,
     allDone,
     wrapTour,
+    endless,
+    helpLevels,
     started,
     reduceMotion,
     guideMain,

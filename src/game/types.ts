@@ -13,6 +13,9 @@ export interface LevelDef {
   edges: [NodeId, NodeId][];
 }
 
+/** A finite list, or a function that can mint the next map forever. */
+export type LevelSource = readonly LevelDef[] | ((index: number) => LevelDef);
+
 export interface Edge {
   id: string;
   a: NodeId;

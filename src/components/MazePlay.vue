@@ -2,12 +2,13 @@
 import type { Component } from 'vue';
 import { useMazePlay, type MazeSpeech } from '../composables/useMazePlay';
 import type { OverlayCopy, SessionCopy } from '../game/copy';
-import type { LevelDef } from '../game/types';
+import type { LevelDef, LevelSource } from '../game/types';
 import MazeOverlays from './MazeOverlays.vue';
 import PlayChrome from './PlayChrome.vue';
 
 const props = defineProps<{
-  catalog: readonly LevelDef[];
+  catalog: LevelSource;
+  picks?: readonly LevelDef[];
   copy: SessionCopy;
   overlayCopy: OverlayCopy;
   speech: MazeSpeech;
@@ -24,6 +25,7 @@ defineEmits<{
 
 const play = useMazePlay({
   catalog: props.catalog,
+  picks: props.picks,
   copy: props.copy,
   speech: props.speech,
   confettiPalette: props.confettiPalette,
@@ -31,7 +33,7 @@ const play = useMazePlay({
 
 const {
   graph, game, overlay, narrow, inFlight, facing, hintNode,
-  completed, interactive, lastLevel, allDone,
+  completed, interactive, lastLevel, allDone, endless, helpLevels,
   guideMain, guideSub,
 } = play.session;
 const {
@@ -81,8 +83,8 @@ const {
       </div>
       <div class="level-badge">
         <span>第 {{ game.level + 1 }} 關</span>
-        <span class="level-dots" aria-hidden="true">
-          <i v-for="(_, i) in catalog" :key="i" :class="i === game.level ? 'current' : completed.has(i) ? 'complete' : ''"/>
+        <span v-if="!endless" class="level-dots" aria-hidden="true">
+          <i v-for="(_, i) in helpLevels" :key="i" :class="i === game.level ? 'current' : completed.has(i) ? 'complete' : ''"/>
         </span>
       </div>
     </section>
@@ -124,8 +126,9 @@ const {
     :level="game.level"
     :last-level="lastLevel"
     :all-done="allDone"
+    :endless="endless"
     :reduce-motion="play.session.reduceMotion"
-    :catalog="catalog"
+    :help-levels="helpLevels"
     :copy="overlayCopy"
     @start="welcomeStart"
     @retry="onRetry"

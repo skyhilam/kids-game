@@ -1,3 +1,4 @@
+import { generateMaze } from '../game/generate';
 import type { LevelDef } from '../game/types';
 
 export const TOOTH_LEVELS: readonly LevelDef[] = [
@@ -43,3 +44,8 @@ export const TOOTH_LEVELS: readonly LevelDef[] = [
     ],
   },
 ];
+
+export function toothLevel(index: number): LevelDef {
+  if (index < TOOTH_LEVELS.length) return TOOTH_LEVELS[index]!;
+  return generateMaze('tooth', index);
+}

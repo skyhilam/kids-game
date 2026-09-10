@@ -10,8 +10,8 @@ import {
   sessionCopy as toothCopy,
 } from '../src/tooth/copy';
 import { findSolution } from '../src/game/rules';
-import { LEVELS } from '../src/picnic/levels';
-import { TOOTH_LEVELS } from '../src/tooth/levels';
+import { LEVELS, picnicLevel } from '../src/picnic/levels';
+import { TOOTH_LEVELS, toothLevel } from '../src/tooth/levels';
 import type { MoveOk, NodeId } from '../src/game/types';
 
 type Session = ReturnType<typeof useGameSession>;
@@ -24,6 +24,14 @@ function picnicSession(hooks: { onSettled?: (result: MoveOk) => void } = {}) {
 
 function toothSession(hooks: { onSettled?: (result: MoveOk) => void } = {}) {
   return useGameSession(hooks, { catalog: TOOTH_LEVELS, copy: toothCopy });
+}
+
+function endlessPicnic(hooks: { onSettled?: (result: MoveOk) => void } = {}) {
+  return useGameSession(hooks, { catalog: picnicLevel, picks: LEVELS, copy: picnicCopy });
+}
+
+function endlessTooth() {
+  return useGameSession({}, { catalog: toothLevel, picks: TOOTH_LEVELS, copy: toothCopy });
 }
 
 let rafQueue: FrameRequestCallback[] = [];
@@ -347,6 +355,40 @@ describe('game session (two-axis overlay)', () => {
     expect(session.overlay.value).toBeNull();
     expect(session.inFlight.value).not.toBeNull();
     flushFrames();
+  });
+
+  it('keeps minting picnic maps instead of wrapping the tour', () => {
+    const session = endlessPicnic();
+    expect(session.endless).toBe(true);
+    session.welcomeStart();
+    session.showHelp();
+    expect(session.jump(LEVELS.length - 1)).toBe(true);
+    followSolution(session);
+    expect(session.overlay.value).toEqual({ kind: 'win' });
+    expect(session.lastLevel.value).toBe(false);
+    expect(session.wrapTour.value).toBe(false);
+    expect(session.next()).toBe(true);
+    expect(session.game.level).toBe(LEVELS.length);
+    expect(session.graph.value.collect).toBeTruthy();
+    expect(session.helpLevels.value).toHaveLength(LEVELS.length + 1);
+    expect(session.helpLevels.value.at(-1)?.index).toBe(LEVELS.length);
+    followSolution(session);
+    expect(session.next()).toBe(true);
+    expect(session.game.level).toBe(LEVELS.length + 1);
+  });
+
+  it('keeps minting tooth maps after the opening set', () => {
+    const session = endlessTooth();
+    expect(session.endless).toBe(true);
+    session.welcomeStart();
+    session.showHelp();
+    expect(session.jump(TOOTH_LEVELS.length - 1)).toBe(true);
+    followSolution(session);
+    expect(session.next()).toBe(true);
+    expect(session.game.level).toBe(TOOTH_LEVELS.length);
+    expect(session.graph.value.hazards.length).toBeGreaterThan(0);
+    followSolution(session);
+    expect(session.game.won).toBe(true);
   });
 
   it('uses retry as the stuck and rescue recovery path', () => {

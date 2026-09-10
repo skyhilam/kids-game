@@ -1,4 +1,4 @@
-import type { Edge, Graph, LevelDef, Link, NodeId, Point } from './types';
+import type { Edge, Graph, LevelDef, LevelSource, Link, NodeId, Point } from './types';
 
 /** Undirected road id. `s-a` and `a-s` are the same road. */
 export function roadKey(a: NodeId, b: NodeId): string {
@@ -19,14 +19,22 @@ export type GraphLabels = {
   deadend?: string;
 };
 
-export function makeGraph(
-  catalog: readonly LevelDef[],
-  index: number,
+export function isLevelFn(source: LevelSource): source is (index: number) => LevelDef {
+  return typeof source === 'function';
+}
+
+export function levelAt(source: LevelSource, index: number): LevelDef {
+  if (isLevelFn(source)) return source(Math.max(0, Math.floor(index)));
+  const def = source[index];
+  if (!def) throw new Error(`Unknown level ${index}`);
+  return def;
+}
+
+export function graphFromLevel(
+  source: LevelDef,
   narrow = false,
   labels: GraphLabels = {},
 ): Graph {
-  const source = catalog[index];
-  if (!source) throw new Error(`Unknown level ${index}`);
   const nodes: Record<NodeId, Point> = Object.fromEntries(
     Object.entries(source.nodes).map(([id, [x, y]]) => [
       id,
@@ -78,4 +86,13 @@ export function makeGraph(
     edges,
     adj,
   };
+}
+
+export function makeGraph(
+  source: LevelSource,
+  index: number,
+  narrow = false,
+  labels: GraphLabels = {},
+): Graph {
+  return graphFromLevel(levelAt(source, index), narrow, labels);
 }

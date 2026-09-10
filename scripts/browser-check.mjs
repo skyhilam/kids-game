@@ -52,6 +52,10 @@ async function openHub(page) {
 async function startPicnic(page) {
   await page.getByRole('button', { name: '一起去野餐 先到漢堡店，再前往公園。' }).click();
   await page.waitForSelector('#startBtn');
+  const footnote = await page.locator('.dialog-footnote').textContent();
+  if (!footnote?.includes('一路玩下去')) {
+    throw new Error(`picnic welcome should be endless, got ${footnote}`);
+  }
   const names = await spriteNames(page);
   const missing = PICNIC_ART.filter((name) => !names.includes(name));
   if (missing.length) throw new Error(`missing picnic sprites: ${missing.join(',')}`);
@@ -65,6 +69,63 @@ async function startPicnic(page) {
   const targets = await page.locator('.step-target').count();
   if (targets < 1) throw new Error('no picnic move targets after start');
   return { boardBox, targets };
+}
+
+async function waitPlayable(page) {
+  await page.waitForFunction(() => {
+    const hint = document.querySelector('.action-button.hint');
+    return !document.querySelector('dialog')?.open && Boolean(hint) && !hint.disabled;
+  });
+  await page.waitForSelector('.step-target');
+}
+
+async function jumpToNamedLevel(page, name, badge) {
+  await page.click('button[aria-label="遊戲說明與關卡選擇"]');
+  await page.getByRole('heading', { name: '遊戲說明' }).waitFor();
+  await page.getByRole('button', { name: new RegExp(name) }).click();
+  await page.waitForFunction((text) => {
+    const badgeText = document.querySelector('.level-badge')?.textContent || '';
+    const hint = document.querySelector('.action-button.hint');
+    return !document.querySelector('dialog')?.open && badgeText.includes(text) && Boolean(hint) && !hint.disabled;
+  }, badge);
+}
+
+async function followHintsToWin(page) {
+  await waitPlayable(page);
+  for (let i = 0; i < 24; i += 1) {
+    if (await page.locator('#nextBtn').isVisible().catch(() => false)) return;
+    await page.locator('.action-button.hint:not([disabled])').click();
+    if (await page.locator('#rescueBtn').isVisible().catch(() => false)) {
+      throw new Error('hint reported no solution');
+    }
+    const hinted = page.locator('.step-target.hinted');
+    await hinted.waitFor({ state: 'visible' });
+    await hinted.click();
+    await page.waitForFunction(() => {
+      if (document.querySelector('#nextBtn') && document.querySelector('dialog')?.open) return true;
+      const hint = document.querySelector('.action-button.hint');
+      return Boolean(hint) && !hint.disabled && !document.querySelector('.board.moving');
+    });
+  }
+  throw new Error('did not reach a win with hints');
+}
+
+async function playThroughGenerated(page, lastName, lastBadge, generatedLabel) {
+  await jumpToNamedLevel(page, lastName, lastBadge);
+  await followHintsToWin(page);
+  const nextLabel = await page.locator('#nextBtn').innerText();
+  if (!nextLabel.includes('下一關')) throw new Error(`expected 下一關, got ${nextLabel}`);
+  await page.click('#nextBtn');
+  await waitPlayable(page);
+  const badge = await page.locator('.level-badge').innerText();
+  if (!badge.includes(generatedLabel)) throw new Error(`badge was ${badge}`);
+  if (await page.locator('.level-dots').count()) throw new Error('endless maps should not show finite level dots');
+  await followHintsToWin(page);
+  await page.click('#nextBtn');
+  await waitPlayable(page);
+  const later = await page.locator('.level-badge').innerText();
+  const laterNumber = Number.parseInt(generatedLabel.replace(/[^\d]/g, ''), 10) + 1;
+  if (!later.includes(`第 ${laterNumber} 關`)) throw new Error(`second generated badge was ${later}`);
 }
 
 async function goHome(page) {
@@ -98,6 +159,10 @@ async function runActivities(page) {
 
   await page.getByRole('button', { name: '打敗蛀牙蟲 走到終點，途中避開蛀牙蟲。' }).click();
   await page.waitForSelector('#startBtn');
+  const toothNote = await page.locator('.dialog-footnote').textContent();
+  if (!toothNote?.includes('一路玩下去')) {
+    throw new Error(`tooth welcome should be endless, got ${toothNote}`);
+  }
   const toothSprites = await spriteNames(page);
   for (const name of ['kid', 'tooth', 'bug-coral', 'toothbrush']) {
     if (!toothSprites.includes(name)) throw new Error(`missing tooth sprite: ${name}`);
@@ -140,13 +205,26 @@ try {
   const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
   await runPicnicPass(page, 1);
   await page.screenshot({ path: join(outDir, 'game.png'), fullPage: true });
+  await playThroughGenerated(page, '盡頭探險', '第 6 關', '第 7 關');
+  await page.screenshot({ path: join(outDir, 'picnic-generated.png'), fullPage: true });
+  log('desktop picnic: generated maps 7 then 8 playable');
+  await goHome(page);
   await runPicnicPass(page, 2);
   await runActivities(page);
+  await page.getByRole('button', { name: '打敗蛀牙蟲 走到終點，途中避開蛀牙蟲。' }).click();
+  await page.click('#startBtn');
+  await waitPlayable(page);
+  await playThroughGenerated(page, '同一條路一次', '第 3 關', '第 4 關');
+  await page.screenshot({ path: join(outDir, 'tooth-generated.png'), fullPage: true });
+  log('desktop tooth: generated maps 4 then 5 playable');
+  await goHome(page);
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await openHub(mobile);
   const { boardBox } = await startPicnic(mobile);
   if (boardBox.width < 200) throw new Error(`mobile picnic board too small: ${JSON.stringify(boardBox)}`);
+  await playThroughGenerated(mobile, '盡頭探險', '第 6 關', '第 7 關');
+  await mobile.screenshot({ path: join(outDir, 'picnic-generated-mobile.png'), fullPage: true });
   await goHome(mobile);
   await mobile.getByRole('button', { name: '打敗蛀牙蟲' }).click();
   await mobile.waitForSelector('#startBtn');

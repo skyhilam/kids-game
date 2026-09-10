@@ -1,17 +1,19 @@
-import { makeGraph, type GraphLabels } from './graph';
-import type { GameState, Graph, LevelDef, Link, MoveOk, MoveResult, NodeId } from './types';
+import { isLevelFn, makeGraph, type GraphLabels } from './graph';
+import type { GameState, Graph, LevelSource, Link, MoveOk, MoveResult, NodeId } from './types';
 
-export { makeGraph, roadKey, mapSize } from './graph';
+export { isLevelFn, levelAt, makeGraph, roadKey, mapSize } from './graph';
 export type { GraphLabels } from './graph';
-export type { GameState, Graph, Link, MoveResult, NodeId, StallReason } from './types';
+export type { GameState, Graph, LevelSource, Link, MoveResult, NodeId, StallReason } from './types';
 
 export function createGame(
-  catalog: readonly LevelDef[],
+  catalog: LevelSource,
   levelIndex = 0,
   narrow = false,
   labels: GraphLabels = {},
 ): { graph: Graph; state: GameState } {
-  const level = Math.max(0, Math.min(levelIndex, catalog.length - 1));
+  const level = isLevelFn(catalog)
+    ? Math.max(0, Math.floor(levelIndex))
+    : Math.max(0, Math.min(levelIndex, catalog.length - 1));
   const graph = makeGraph(catalog, level, narrow, labels);
   return {
     graph,
