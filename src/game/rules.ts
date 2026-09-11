@@ -22,6 +22,7 @@ export function createGame(
       node: graph.start,
       collected: graph.collect === null,
       used: new Set(),
+      usedFrom: {},
       won: false,
       stalled: false,
     },
@@ -114,6 +115,7 @@ export function tryMove(graph: Graph, state: GameState, to: NodeId): MoveResult 
 
 export function applyMove(state: GameState, move: MoveOk): void {
   state.used.add(move.edgeId);
+  state.usedFrom[move.edgeId] = move.from;
   state.node = move.to;
   state.collected = move.collected;
   state.won = move.won;

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useBoardInput } from '../composables/useBoardInput';
 import { available, mapSize } from '../game/rules';
 import { carPose, easeInOut } from '../game/motion';
+import { traveledPath } from '../game/trail';
 import type { GameState, Graph, InFlightMove, NodeId } from '../game/types';
 
 const props = withDefaults(defineProps<{
@@ -82,14 +83,19 @@ function showHand(to: NodeId, index: number): boolean {
   );
 }
 
-const usedEdges = computed(() => props.graph.edges.filter((edge) => props.state.used.has(edge.id)));
+const usedEdges = computed(() => props.graph.edges
+  .filter((edge) => props.state.used.has(edge.id))
+  .map((edge) => ({
+    id: edge.id,
+    d: traveledPath(props.graph.nodes, edge, props.state.usedFrom[edge.id]),
+  })));
 
 const animTrail = computed(() => {
   const anim = props.inFlight;
   if (!anim || anim.t >= 1) return null;
   const edge = props.graph.edges.find((item) => item.id === anim.edgeId);
   if (!edge) return null;
-  const d = anim.reverse ? pathOf(edge.b, edge.a) : pathOf(edge.a, edge.b);
+  const d = traveledPath(props.graph.nodes, edge, anim.from);
   const length = edgeLength(edge.a, edge.b);
   const t = easeInOut(anim.t);
   return { d, length, offset: length * (1 - t) };
@@ -160,8 +166,8 @@ const { onPointerDown, onPointerUp, onPointerCancel } = useBoardInput({
         </g>
         <g id="trails">
           <template v-for="edge in usedEdges" :key="'used-'+edge.id">
-            <path class="road-used" :d="pathOf(edge.a, edge.b)" :data-edge="edge.id"/>
-            <path class="road-used-inner" :d="pathOf(edge.a, edge.b)"/>
+            <path class="road-used" :d="edge.d" :data-edge="edge.id"/>
+            <path class="road-used-inner" :d="edge.d"/>
           </template>
           <path
             v-if="animTrail"

@@ -51,6 +51,8 @@ export interface GameState {
   node: NodeId;
   collected: boolean;
   used: Set<string>;
+  /** Node left when each undirected road was first traveled. Used only to draw the trail. */
+  usedFrom: Record<string, NodeId>;
   won: boolean;
   stalled: false | StallReason;
 }
