@@ -67,6 +67,7 @@ describe('picnic game rules (shipped logic)', () => {
     expect(forward.edgeId).toBe('a-s');
     expect(state.node).toBe('a');
     expect(state.used.has('a-s')).toBe(true);
+    expect(state.usedFrom['a-s']).toBe(graph.start);
 
     const reverse = tryMove(graph, state, graph.start);
     expect(reverse.ok).toBe(false);
