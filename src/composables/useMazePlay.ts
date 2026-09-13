@@ -2,15 +2,13 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import {
   cancelSpeech,
   initAudio,
-  loadVoices,
-  playNotes,
-  resumeAudio,
+  playCue,
   speak,
-  suspendAudio,
 } from '../game/audio';
 import type { SessionCopy } from '../game/copy';
 import type { LevelDef, LevelSource, MoveOk, NodeId, StallReason } from '../game/types';
 import { useGameSession } from './useGameSession';
+import { usePlayAudio } from './usePlayAudio';
 
 export type MazeSpeech = {
   welcome: string;
@@ -28,25 +26,22 @@ export function useMazePlay(options: {
   speech: MazeSpeech;
   confettiPalette: readonly string[];
 }) {
-  const soundOn = ref(true);
-  const toastText = ref('');
-  const toastOn = ref(false);
+  const { soundOn, toastText, toastOn, toast, toggleSound } = usePlayAudio();
   const confettiBits = ref<{ i: number; left: string; bg: string; delay: string; duration: string; round: boolean; drift: string }[]>([]);
-  let toastTimer = 0;
   let confettiTimer = 0;
   const palette = options.confettiPalette;
 
   function onSettled(result: MoveOk): void {
     if (result.collectedNow && options.speech.collected) {
-      playNotes(soundOn.value, [[523, 0, 0.18], [659, 0.13, 0.18], [784, 0.26, 0.27]]);
+      playCue(soundOn.value, 'collect');
       speak(soundOn.value, options.speech.collected);
     }
     if (result.won) {
-      playNotes(soundOn.value, [[523, 0, 0.22], [659, 0.15, 0.22], [784, 0.3, 0.22], [1047, 0.48, 0.5]]);
+      playCue(soundOn.value, 'win');
       return;
     }
     if (result.stalled) {
-      playNotes(soundOn.value, [[440, 0, 0.2, 0.035], [523, 0.18, 0.3, 0.04]]);
+      playCue(soundOn.value, 'fail');
       const line = options.speech.stuck[result.stalled];
       if (line) speak(soundOn.value, line);
     }
@@ -57,13 +52,6 @@ export function useMazePlay(options: {
     picks: options.picks,
     copy: options.copy,
   });
-
-  function toast(text: string): void {
-    window.clearTimeout(toastTimer);
-    toastText.value = text;
-    toastOn.value = true;
-    toastTimer = window.setTimeout(() => { toastOn.value = false; }, 2600);
-  }
 
   function clearConfetti(): void {
     window.clearTimeout(confettiTimer);
@@ -100,42 +88,29 @@ export function useMazePlay(options: {
       if (result.reason === 'used-road') toast('此段橙色道路已經通行，請改選其他路線。');
       return;
     }
-    playNotes(soundOn.value, [[430, 0, 0.10, 0.045], [510, 0.07, 0.12, 0.035]]);
+    playCue(soundOn.value, 'move');
   }
 
   function welcomeStart(): void {
     if (!session.welcomeStart()) return;
     initAudio(soundOn.value);
-    playNotes(soundOn.value, [[523, 0, 0.16], [659, 0.12, 0.22]]);
+    playCue(soundOn.value, 'welcome');
     speak(soundOn.value, options.speech.welcome);
   }
 
   function onHint(): void {
     const result = session.requestHint();
     if (result === 'blocked') return;
-    playNotes(soundOn.value, [[660, 0, 0.15], [880, 0.11, 0.22]]);
+    playCue(soundOn.value, 'hint');
     if (result === 'hint') speak(soundOn.value, session.guideMain.value);
     else speak(soundOn.value, options.speech.rescue);
-  }
-
-  function toggleSound(): void {
-    soundOn.value = !soundOn.value;
-    if (soundOn.value) {
-      initAudio(true);
-      playNotes(true, [[659, 0, 0.17]]);
-      speak(true, '聲音已開啟。');
-    } else {
-      cancelSpeech();
-      suspendAudio();
-    }
-    toast(soundOn.value ? '聲音已開啟' : '聲音已關閉');
   }
 
   function onRestart(): void {
     if (!session.restart()) return;
     clearConfetti();
     cancelSpeech();
-    playNotes(soundOn.value, [[523, 0, 0.18]]);
+    playCue(soundOn.value, 'restart');
     speakAnnounce();
   }
 
@@ -172,41 +147,13 @@ export function useMazePlay(options: {
     session.applyLayout();
   }
 
-  function onVisibility(): void {
-    if (document.hidden) {
-      cancelSpeech();
-      suspendAudio();
-    } else if (session.started.value && soundOn.value) {
-      resumeAudio(true);
-    }
-  }
-
-  function onPageHide(): void {
-    cancelSpeech();
-    suspendAudio();
-  }
-
   onMounted(() => {
-    loadVoices();
-    if (window.speechSynthesis?.addEventListener) {
-      window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-    }
     window.addEventListener('resize', onResize);
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('pagehide', onPageHide);
   });
 
   onUnmounted(() => {
-    if (window.speechSynthesis?.removeEventListener) {
-      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-    }
     window.removeEventListener('resize', onResize);
-    document.removeEventListener('visibilitychange', onVisibility);
-    window.removeEventListener('pagehide', onPageHide);
-    window.clearTimeout(toastTimer);
     clearConfetti();
-    cancelSpeech();
-    suspendAudio();
   });
 
   return {

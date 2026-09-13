@@ -1,13 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
-import GameSprite from './GameSprite.vue';
-import DeliveryBoard from './DeliveryBoard.vue';
-import MazeDialog from './MazeDialog.vue';
+import { usePlayAudio } from '../composables/usePlayAudio';
 import { deliveryMission } from '../delivery/generate';
+import { cancelSpeech, initAudio, playCue, speak } from '../game/audio';
 import { createRouteState, findRouteSolution, moveOnRoute, type RouteFailure, type RouteMission } from '../game/routeMission';
 import type { Point } from '../game/types';
+import DeliveryBoard from './DeliveryBoard.vue';
+import GameSprite from './GameSprite.vue';
+import MazeDialog from './MazeDialog.vue';
+import PlayChrome from './PlayChrome.vue';
+
+const SPEECH = {
+  welcome: '開始送貨。請先找到一號屋，再從小車出發。',
+  win: '三份包裹都送到了，也到達終點了。',
+  stuck: '剩下的小路未能完成送貨。沒有關係，一起再試一次。',
+  delivered: '包裹送到了。',
+} as const;
 
 const emit = defineEmits<{ home: [] }>();
+const { soundOn, toastText, toastOn, toggleSound } = usePlayAudio();
 const source = deliveryMission();
 const state = reactive(createRouteState(source));
 const narrow = ref(window.innerWidth <= 600);
@@ -42,14 +53,37 @@ function move(to: string): void {
   const result = moveOnRoute(mission.value, state, to);
   if (!result.ok) { feedback(result.reason); return; }
   hint.value = null;
-  if (state.won) { message.value = '三份包裹都送好了，也到達終點了！'; overlay.value = 'win'; }
-  else if (state.stalled) overlay.value = 'stuck';
-  else if (state.delivered > before) {
+  if (state.won) {
+    message.value = '三份包裹都送好了，也到達終點了！';
+    overlay.value = 'win';
+    playCue(soundOn.value, 'win');
+    speak(soundOn.value, SPEECH.win);
+  } else if (state.stalled) {
+    overlay.value = 'stuck';
+    playCue(soundOn.value, 'fail');
+    speak(soundOn.value, SPEECH.stuck);
+  } else if (state.delivered > before) {
+    playCue(soundOn.value, 'collect');
+    speak(soundOn.value, SPEECH.delivered);
     message.value = state.delivered === mission.value.stops.length
       ? '三份包裹都送好了！沿未走過的小路，到藍色終點吧。'
       : `第 ${state.delivered} 份包裹送到了！下一站是 ${nextStop.value}。`;
+  } else {
+    playCue(soundOn.value, 'move');
+    message.value = `下一站：${nextStop.value}。看看還有哪些白色小路。`;
   }
-  else message.value = `下一站：${nextStop.value}。看看還有哪些白色小路。`;
+}
+
+function beginPlay(): void {
+  overlay.value = null;
+  initAudio(soundOn.value);
+  playCue(soundOn.value, 'welcome');
+  speak(soundOn.value, SPEECH.welcome);
+}
+
+function closeHelpOrStart(): void {
+  if (overlay.value === 'welcome') beginPlay();
+  else overlay.value = null;
 }
 
 function restart(): void {
@@ -58,6 +92,8 @@ function restart(): void {
   epoch.value += 1;
   message.value = '先找一找 1 號屋，再從小車出發。';
   overlay.value = null;
+  cancelSpeech();
+  playCue(soundOn.value, 'restart');
 }
 
 function showHint(): void {
@@ -65,15 +101,19 @@ function showHint(): void {
   if (tracingTo.value) {
     hint.value = tracingTo.value;
     message.value = '先沿綠色虛線，把這一小段畫到路口，再看看下一步。';
+    playCue(soundOn.value, 'hint');
     return;
   }
   const path = findRouteSolution(mission.value, state);
   if (path?.length) {
     hint.value = path[0];
     message.value = `試試綠色虛線這條路，繼續前往${nextStop.value}。`;
+    playCue(soundOn.value, 'hint');
   } else {
     message.value = '這條路線已經無法完成送貨，重新規劃一次吧。';
     overlay.value = 'stuck';
+    playCue(soundOn.value, 'fail');
+    speak(soundOn.value, SPEECH.stuck);
   }
 }
 
@@ -99,6 +139,15 @@ onUnmounted(() => window.removeEventListener('resize', resize));
       </div>
       <div class="top-actions">
         <button class="action-button" @click="emit('home')">選擇遊戲</button>
+        <button
+          class="icon-button"
+          :aria-label="soundOn ? '關閉音效' : '開啟音效'"
+          :aria-pressed="soundOn"
+          title="開關音效"
+          @click="toggleSound"
+        >
+          <svg aria-hidden="true"><use :href="soundOn ? '#i-sound' : '#i-muted'"/></svg>
+        </button>
         <button class="icon-button" aria-label="送貨遊戲說明" @click="overlay = 'help'"><svg aria-hidden="true"><use href="#i-help"/></svg></button>
       </div>
     </header>
@@ -155,7 +204,7 @@ onUnmounted(() => window.removeEventListener('resize', resize));
           <li><span>3</span><div>送完，再到藍色終點<strong>同一段路不能走兩次，反方向也不行。</strong></div></li>
         </ol>
         <details class="delivery-parent"><summary>給家長的小提示</summary><p>先一起找起點、三間屋和終點。問孩子：「先去邊間屋？返程有冇另一條路？」第一次可用點選路口；想畫線時，再用手指或觸控筆慢慢走。可以重經路口，但不能重走已變橙色的路段。</p></details>
-        <button class="primary-button" @click="overlay = null">{{ overlay === 'welcome' ? '開始送貨' : '繼續送貨' }}</button>
+        <button class="primary-button" @click="closeHelpOrStart">{{ overlay === 'welcome' ? '開始送貨' : '繼續送貨' }}</button>
         <button class="secondary-button" type="button" @click="emit('home')">選擇遊戲</button>
       </template>
       <template v-else-if="overlay === 'win'">
@@ -171,6 +220,12 @@ onUnmounted(() => window.removeEventListener('resize', resize));
       </template>
     </div>
   </MazeDialog>
+
+  <PlayChrome
+    :toast-on="toastOn"
+    :toast-text="toastText"
+    :confetti-bits="[]"
+  />
 </template>
 
 <style>
