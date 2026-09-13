@@ -55,7 +55,7 @@ function usedTrailDs(html: string): { edge: string; d: string }[] {
 }
 
 function targetNodes(html: string): string[] {
-  return [...html.matchAll(/data-node="([^"]+)"/g)].map((match) => match[1]).sort();
+  return [...html.matchAll(/<button\b[^>]*\bdata-node="([^"]+)"/g)].map((match) => match[1]).sort();
 }
 
 describe('used-trail travel direction', () => {
