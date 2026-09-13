@@ -3,6 +3,19 @@ import { computed, ref } from 'vue';
 import { useBoardInput } from '../composables/useBoardInput';
 import { available, mapSize } from '../game/rules';
 import { carPose, easeInOut } from '../game/motion';
+import {
+  ROAD_BORDER_RADIUS,
+  ROAD_BORDER_WIDTH,
+  ROAD_FILL_RADIUS,
+  ROAD_FILL_WIDTH,
+  ROAD_INNER_RADIUS,
+  ROAD_INNER_WIDTH,
+  ROAD_USED_RADIUS,
+  centerDashOffset,
+  centerPath,
+  edgePath,
+  jointIds,
+} from '../game/roads';
 import { traveledPath } from '../game/trail';
 import type { GameState, Graph, InFlightMove, NodeId } from '../game/types';
 
@@ -37,9 +50,20 @@ const size = computed(() => mapSize(props.narrow));
 const pose = computed(() => carPose(props.graph, props.state.node, props.facing, props.inFlight));
 
 function pathOf(a: NodeId, b: NodeId): string {
-  const pa = props.graph.nodes[a];
-  const pb = props.graph.nodes[b];
-  return `M${pa[0]},${pa[1]} L${pb[0]},${pb[1]}`;
+  return edgePath(props.graph.nodes[a], props.graph.nodes[b]);
+}
+
+function centerOf(a: NodeId, b: NodeId): string {
+  return centerPath(props.graph.nodes[a], props.graph.nodes[b]);
+}
+
+function dashOffsetOf(a: NodeId, b: NodeId): number {
+  return centerDashOffset(props.graph.nodes[a], props.graph.nodes[b]);
+}
+
+function nodeAt(id: NodeId): { id: NodeId; x: number; y: number } {
+  const [x, y] = props.graph.nodes[id];
+  return { id, x, y };
 }
 
 function edgeLength(a: NodeId, b: NodeId): number {
@@ -83,12 +107,18 @@ function showHand(to: NodeId, index: number): boolean {
   );
 }
 
+const roadJoints = computed(() => jointIds(props.graph.edges).map(nodeAt));
+
 const usedEdges = computed(() => props.graph.edges
   .filter((edge) => props.state.used.has(edge.id))
   .map((edge) => ({
     id: edge.id,
     d: traveledPath(props.graph.nodes, edge, props.state.usedFrom[edge.id]),
   })));
+
+const usedJoints = computed(() => jointIds(
+  props.graph.edges.filter((edge) => props.state.used.has(edge.id)),
+).map(nodeAt));
 
 const animTrail = computed(() => {
   const anim = props.inFlight;
@@ -131,37 +161,71 @@ const { onPointerDown, onPointerUp, onPointerCancel } = useBoardInput({
           <path
             v-for="edge in graph.edges"
             :key="'border-'+edge.id"
+            class="road-edge"
             :d="pathOf(edge.a, edge.b)"
             fill="none"
             :stroke="roads.border"
-            stroke-width="72"
-            stroke-linecap="round"
+            :stroke-width="ROAD_BORDER_WIDTH"
+            stroke-linecap="butt"
+          />
+          <circle
+            v-for="joint in roadJoints"
+            :key="'border-join-'+joint.id"
+            class="road-join-border"
+            :data-node="joint.id"
+            :cx="joint.x"
+            :cy="joint.y"
+            :r="ROAD_BORDER_RADIUS"
+            :fill="roads.border"
           />
           <path
             v-for="edge in graph.edges"
             :key="'fill-'+edge.id"
+            class="road-edge"
             :d="pathOf(edge.a, edge.b)"
             fill="none"
             :stroke="roads.fill"
-            stroke-width="65"
-            stroke-linecap="round"
+            :stroke-width="ROAD_FILL_WIDTH"
+            stroke-linecap="butt"
+          />
+          <circle
+            v-for="joint in roadJoints"
+            :key="'fill-join-'+joint.id"
+            class="road-join-fill"
+            :data-node="joint.id"
+            :cx="joint.x"
+            :cy="joint.y"
+            :r="ROAD_FILL_RADIUS"
+            :fill="roads.fill"
           />
           <template v-if="roads.inner">
             <path
               v-for="edge in graph.edges"
               :key="'inner-'+edge.id"
+              class="road-edge"
               :d="pathOf(edge.a, edge.b)"
               fill="none"
               :stroke="roads.inner"
-              stroke-width="48"
-              stroke-linecap="round"
+              :stroke-width="ROAD_INNER_WIDTH"
+              stroke-linecap="butt"
+            />
+            <circle
+              v-for="joint in roadJoints"
+              :key="'inner-join-'+joint.id"
+              class="road-join-inner"
+              :data-node="joint.id"
+              :cx="joint.x"
+              :cy="joint.y"
+              :r="ROAD_INNER_RADIUS"
+              :fill="roads.inner"
             />
           </template>
           <path
             v-for="edge in graph.edges"
             :key="'center-'+edge.id"
             class="road-center"
-            :d="pathOf(edge.a, edge.b)"
+            :d="centerOf(edge.a, edge.b)"
+            :stroke-dashoffset="dashOffsetOf(edge.a, edge.b)"
           />
         </g>
         <g id="trails">
@@ -169,9 +233,18 @@ const { onPointerDown, onPointerUp, onPointerCancel } = useBoardInput({
             <path class="road-used" :d="edge.d" :data-edge="edge.id"/>
             <path class="road-used-inner" :d="edge.d"/>
           </template>
+          <circle
+            v-for="joint in usedJoints"
+            :key="'used-join-'+joint.id"
+            class="road-used-join"
+            :data-node="joint.id"
+            :cx="joint.x"
+            :cy="joint.y"
+            :r="ROAD_USED_RADIUS"
+          />
           <path
             v-if="animTrail"
-            class="road-used"
+            class="road-used is-growing"
             :d="animTrail.d"
             :stroke-dasharray="`${animTrail.length} ${animTrail.length}`"
             :stroke-dashoffset="animTrail.offset"
