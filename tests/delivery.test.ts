@@ -236,9 +236,15 @@ describe('continuous road tracing', () => {
     expect(traceAlongRoad(resumed.trace, [100, 0], [0, 0], [100, 0], 20).arrived).toBe(true);
   });
 
-  it('does not rewind the vehicle or ink and recognizes vertical road arrival', () => {
-    expect(traceAlongRoad({ to: 'b', t: .6, recovering: false }, [0, 20], [0, 0], [0, 100], 20).point).toEqual([0, 60]);
-    expect(traceAlongRoad({ to: 'b', t: .6, recovering: false }, [0, 95], [0, 0], [0, 100], 20).arrived).toBe(true);
+  it('rewinds uncommitted ink and does not lock a road from a poke at the far end', () => {
+    const back = traceAlongRoad({ to: 'b', t: .6, recovering: false }, [0, 20], [0, 0], [0, 100], 20);
+    expect(back.point).toEqual([0, 20]);
+    expect(back.trace.t).toBe(.2);
+    expect(back.arrived).toBe(false);
+    const poke = traceAlongRoad({ to: 'b', t: .1, recovering: false }, [0, 100], [0, 0], [0, 100], 20);
+    expect(poke.arrived).toBe(false);
+    expect(poke.trace.t).toBeCloseTo(.65);
+    expect(traceAlongRoad({ to: 'b', t: .8, recovering: false }, [0, 95], [0, 0], [0, 100], 20).arrived).toBe(true);
     expect(projectToRoad([50, 40], [0, 0], [100, 100]).point).toEqual([45, 45]);
   });
 });
@@ -312,7 +318,8 @@ describe('corner tracing', () => {
   it('takes the intended T-junction branch when the finger cuts that corner', () => {
     const state = createRouteState(CORNER_MAP);
     const along = strokeAt(CORNER_MAP, state, [80, 40], null);
-    const throughB = strokeAt(CORNER_MAP, state, [240, 40], along.trace);
+    const nearer = strokeAt(CORNER_MAP, state, [180, 40], along.trace);
+    const throughB = strokeAt(CORNER_MAP, state, [240, 40], nearer.trace);
     expect(throughB.arrivals).toEqual(['b']);
     const cutTowardHouse = strokeAt(CORNER_MAP, state, [256, 268], { to: 'c', t: .7, recovering: false });
     expect(cutTowardHouse.arrivals).toEqual(['c']);
@@ -349,16 +356,43 @@ describe('corner tracing', () => {
     expect(next.trace?.to).toBe('c');
   });
 
-  it('attaches to the next edge from a few pixels past the junction after arrival', () => {
+  it('does not lock the next T-arm from a slight overshoot past the junction', () => {
     const state = createRouteState(CORNER_MAP);
     const along = strokeAt(CORNER_MAP, state, [120, 40], null);
     const arrived = strokeAt(CORNER_MAP, state, [240, 40], along.trace);
     expect(arrived.arrivals).toEqual(['b']);
     expect(state.node).toBe('b');
-    const continueDown = strokeAt(CORNER_MAP, state, [240, 48], null, false, 0);
+    const overshoot = strokeAt(CORNER_MAP, state, [240, 48], null, false, 0);
+    expect(overshoot.offRoad).toBe(false);
+    expect(overshoot.trace).toBeNull();
+    expect(state.used.has(roadKey('b', 'c'))).toBe(false);
+    const continueDown = strokeAt(CORNER_MAP, state, [240, 70], null, false, 0);
     expect(continueDown.offRoad).toBe(false);
     expect(continueDown.trace?.to).toBe('c');
     expect(continueDown.trace?.t).toBeGreaterThan(0);
+    expect(state.used.has(roadKey('b', 'c'))).toBe(false);
+  });
+
+  it('lets a T-junction stroke rewind and take another arm before the road locks', () => {
+    const tee: RouteMission = {
+      ...CORNER_MAP,
+      name: 'tee',
+      nodes: { ...CORNER_MAP.nodes, n: [240, 0] },
+      edges: [...CORNER_MAP.edges, ['b', 'n']],
+    };
+    const state = createRouteState(tee);
+    const along = strokeAt(tee, state, [120, 40], null);
+    const atB = strokeAt(tee, state, [240, 40], along.trace);
+    expect(atB.arrivals).toEqual(['b']);
+    const down = strokeAt(tee, state, [240, 80], null);
+    expect(down.trace?.to).toBe('c');
+    expect(state.used.has(roadKey('b', 'c'))).toBe(false);
+    const back = strokeAt(tee, state, [240, 44], down.trace);
+    expect(back.trace).toBeNull();
+    const up = strokeAt(tee, state, [240, 16], null);
+    expect(up.trace?.to).toBe('n');
+    expect(state.used.has(roadKey('b', 'c'))).toBe(false);
+    expect(state.used.has(roadKey('b', 'n'))).toBe(false);
   });
 
   it('keeps one-use roads and house order when a stroke arrives at a junction', () => {

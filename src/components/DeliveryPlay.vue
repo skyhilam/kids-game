@@ -176,7 +176,7 @@ onUnmounted(() => window.removeEventListener('resize', resize));
     <section class="bottom-bar" aria-label="送貨提示及操作">
       <div class="guide">
         <div class="guide-avatar" aria-hidden="true"><GameSprite name="courier"/></div>
-        <div class="guide-copy"><div class="guide-main" role="status" aria-live="polite">{{ message }}</div><div class="guide-sub">{{ mode === 'trace' ? '可以停下、放手，再從小車繼續。' : '按箭嘴或方向鍵選路。' }}橙色小路不能再走。</div></div>
+        <div class="guide-copy"><div class="guide-main" role="status" aria-live="polite">{{ message }}</div><div class="guide-sub">{{ mode === 'trace' ? '未到路口可以拉返轉彎；到咗先鎖定。放手可再畫。' : '按箭嘴或方向鍵選路。' }}橙色小路不能再走。</div></div>
       </div>
       <div class="bottom-actions">
         <button class="action-button hint" :disabled="!enabled" @click="showHint"><svg aria-hidden="true"><use href="#i-bulb"/></svg>提示</button>

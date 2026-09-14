@@ -1,7 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue';
 import { roadKey } from '../game/graph';
 import { checkRouteMove, routeNeighbors, type RouteFailure, type RouteMission, type RouteState } from '../game/routeMission';
-import { followRouteStroke, type RoadTrace } from '../game/trace';
+import { continueAlong, followRouteStroke, type RoadTrace } from '../game/trace';
 import type { Point } from '../game/types';
 
 export function useRouteTrace(options: {
@@ -40,7 +40,7 @@ export function useRouteTrace(options: {
 
   function tolerance(): number {
     const rect = options.surface.value!.getBoundingClientRect();
-    return Math.max(26, 14 / rect.width * options.mission().width);
+    return Math.max(30, 16 / rect.width * options.mission().width);
   }
 
   function stopPointer(): void {
@@ -86,9 +86,7 @@ export function useRouteTrace(options: {
         return checkRouteMove(mission, preview, to).ok;
       },
       tolerance: tolerance(),
-      // After the stroke has begun, do not require a 10px leave-junction before
-      // attaching — that gap is what made L/T corners feel dead.
-      settle: drawing ? 0 : 10,
+      settle: drawing ? continueAlong(tolerance()) : Math.max(12, continueAlong(tolerance()) * 0.75),
       onArrive: (to) => options.move(to),
       shouldContinue: () => options.enabled(),
     });
