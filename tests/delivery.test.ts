@@ -335,6 +335,32 @@ describe('corner tracing', () => {
     expect(junctionSlack(26)).toBeGreaterThan(26);
   });
 
+  it('ignores the just-used incoming road so a turn can attach after arrival', () => {
+    const state = createRouteState(CORNER_MAP);
+    const along = strokeAt(CORNER_MAP, state, [120, 40], null);
+    const arrived = strokeAt(CORNER_MAP, state, [240, 40], along.trace);
+    expect(arrived.arrivals).toEqual(['b']);
+    const linger = strokeAt(CORNER_MAP, state, [225, 40], null, false, 0);
+    expect(linger.offRoad).toBe(false);
+    expect(linger.blockedTo).toBeUndefined();
+    expect(linger.trace).toBeNull();
+    const next = strokeAt(CORNER_MAP, state, [240, 60], null, false, 0);
+    expect(next.offRoad).toBe(false);
+    expect(next.trace?.to).toBe('c');
+  });
+
+  it('attaches to the next edge from a few pixels past the junction after arrival', () => {
+    const state = createRouteState(CORNER_MAP);
+    const along = strokeAt(CORNER_MAP, state, [120, 40], null);
+    const arrived = strokeAt(CORNER_MAP, state, [240, 40], along.trace);
+    expect(arrived.arrivals).toEqual(['b']);
+    expect(state.node).toBe('b');
+    const continueDown = strokeAt(CORNER_MAP, state, [240, 48], null, false, 0);
+    expect(continueDown.offRoad).toBe(false);
+    expect(continueDown.trace?.to).toBe('c');
+    expect(continueDown.trace?.t).toBeGreaterThan(0);
+  });
+
   it('keeps one-use roads and house order when a stroke arrives at a junction', () => {
     const state = createRouteState(DELIVERY_MISSION);
     const start = DELIVERY_MISSION.nodes.start;

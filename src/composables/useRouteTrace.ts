@@ -15,6 +15,7 @@ export function useRouteTrace(options: {
   const trace = ref<RoadTrace | null>(null);
   let pointerId: number | null = null;
   let needsReturn = false;
+  let drawing = false;
   const position = computed<Point>(() => {
     const from = options.mission().nodes[options.state().node];
     if (!trace.value) return from;
@@ -23,7 +24,16 @@ export function useRouteTrace(options: {
   });
 
   function pointerPoint(event: PointerEvent): Point {
-    const rect = options.surface.value!.getBoundingClientRect();
+    const svg = options.surface.value!;
+    const ctm = svg.getScreenCTM();
+    if (ctm) {
+      const pt = svg.createSVGPoint();
+      pt.x = event.clientX;
+      pt.y = event.clientY;
+      const mapped = pt.matrixTransform(ctm.inverse());
+      return [mapped.x, mapped.y];
+    }
+    const rect = svg.getBoundingClientRect();
     const mission = options.mission();
     return [(event.clientX - rect.left) / rect.width * mission.width, (event.clientY - rect.top) / rect.height * mission.height];
   }
@@ -41,7 +51,7 @@ export function useRouteTrace(options: {
     }
   }
 
-  function reset(): void { stopPointer(); trace.value = null; needsReturn = false; }
+  function reset(): void { stopPointer(); trace.value = null; needsReturn = false; drawing = false; }
 
   function onPointerDown(event: PointerEvent): void {
     if (!options.enabled() || !event.isPrimary || event.button !== 0) return;
@@ -52,14 +62,14 @@ export function useRouteTrace(options: {
     }
     event.preventDefault();
     needsReturn = false;
+    drawing = false;
     pointerId = event.pointerId;
-    options.surface.value!.setPointerCapture(event.pointerId);
+    try { options.surface.value!.setPointerCapture(event.pointerId); } catch { /* synthetic pointers */ }
   }
 
   function onPointerMove(event: PointerEvent): void {
     if (pointerId !== event.pointerId || !options.enabled()) return;
     const mission = options.mission();
-    const continuing = !!trace.value;
     const result = followRouteStroke({
       pointer: pointerPoint(event),
       trace: trace.value,
@@ -76,12 +86,15 @@ export function useRouteTrace(options: {
         return checkRouteMove(mission, preview, to).ok;
       },
       tolerance: tolerance(),
-      settle: continuing ? 0 : 10,
+      // After the stroke has begun, do not require a 10px leave-junction before
+      // attaching — that gap is what made L/T corners feel dead.
+      settle: drawing ? 0 : 10,
       onArrive: (to) => options.move(to),
       shouldContinue: () => options.enabled(),
     });
     trace.value = result.trace;
     needsReturn = result.needsReturn;
+    if (result.trace || result.arrivals.length) drawing = true;
     if (result.offRoad) options.feedback('off-road');
     if (result.blockedTo) {
       const blocked = checkRouteMove(mission, options.state(), result.blockedTo);

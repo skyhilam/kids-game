@@ -120,20 +120,26 @@ export function followRouteStroke(input: RouteStrokeInput): RouteStrokeResult {
   for (let hop = 0; hop < 8; hop += 1) {
     const from = input.nodes[node];
     if (!trace) {
-      const nearby = pickNearestRoad(input.pointer, from, roadPoints(node, input.nodes, input.exits), slack);
-      if (needsReturn && !nearby && Math.hypot(input.pointer[0] - from[0], input.pointer[1] - from[1]) > input.tolerance) {
+      const hits = roadPoints(node, input.nodes, input.exits)
+        .map((road) => ({ to: road.to, ...projectToRoad(input.pointer, from, road.point) }))
+        .filter((item) => item.t > 1e-6 && item.distance <= slack)
+        .sort((a, b) => a.distance - b.distance);
+      const nearby = hits.find((item) => input.canEnter(node, item.to));
+      const away = Math.hypot(input.pointer[0] - from[0], input.pointer[1] - from[1]);
+      if (needsReturn && !nearby && away > input.tolerance) {
         return { trace: null, needsReturn: true, arrivals, offRoad: true };
       }
       if (!nearby) {
-        const atNode = Math.hypot(input.pointer[0] - from[0], input.pointer[1] - from[1]) <= slack;
-        if (atNode) return { trace: null, needsReturn: false, arrivals, offRoad: false };
+        if (away <= slack) {
+          if (hits[0] && away > slack * 0.55) {
+            return { trace: null, needsReturn: false, arrivals, offRoad: false, blockedTo: hits[0].to };
+          }
+          return { trace: null, needsReturn: false, arrivals, offRoad: false };
+        }
         return { trace: null, needsReturn: true, arrivals, offRoad: true };
       }
-      if (Math.hypot(input.pointer[0] - from[0], input.pointer[1] - from[1]) < settle) {
+      if (away < settle) {
         return { trace: null, needsReturn: false, arrivals, offRoad: false };
-      }
-      if (!input.canEnter(node, nearby.to)) {
-        return { trace: null, needsReturn: false, arrivals, offRoad: false, blockedTo: nearby.to };
       }
       needsReturn = false;
       settle = 0;
