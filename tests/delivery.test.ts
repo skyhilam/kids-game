@@ -1,9 +1,13 @@
+import { createSSRApp, h } from 'vue';
+import { renderToString } from 'vue/server-renderer';
 import { describe, expect, it } from 'vitest';
+import DeliveryBoard from '../src/components/DeliveryBoard.vue';
 import { deliveryMission, generateDeliveryMission } from '../src/delivery/generate';
 import { DELIVERY_MISSION } from '../src/delivery/mission';
 import { roadKey } from '../src/game/graph';
-import { checkRouteMove, createRouteState, findRouteSolution, moveOnRoute, type RouteMission } from '../src/game/routeMission';
-import { projectToRoad, traceAlongRoad } from '../src/game/trace';
+import { checkRouteMove, createRouteState, findRouteSolution, moveOnRoute, type RouteMission, type RouteState } from '../src/game/routeMission';
+import { followRouteStroke, junctionSlack, projectToRoad, traceAlongRoad } from '../src/game/trace';
+import type { Point } from '../src/game/types';
 
 const route = ['a', 'e', 'end', 'g', 'house1', 'd', 'b', 'house2', 'c', 'd', 'e', 'f', 'house3', 'j', 'finish'];
 
@@ -236,5 +240,134 @@ describe('continuous road tracing', () => {
     expect(traceAlongRoad({ to: 'b', t: .6, recovering: false }, [0, 20], [0, 0], [0, 100], 20).point).toEqual([0, 60]);
     expect(traceAlongRoad({ to: 'b', t: .6, recovering: false }, [0, 95], [0, 0], [0, 100], 20).arrived).toBe(true);
     expect(projectToRoad([50, 40], [0, 0], [100, 100]).point).toEqual([45, 45]);
+  });
+});
+
+const CORNER_MAP: RouteMission = {
+  name: 'corners',
+  width: 400,
+  height: 400,
+  start: 'a',
+  finish: 'e',
+  stops: [{ node: 'house', label: 'house' }],
+  nodes: {
+    a: [40, 40],
+    b: [240, 40],
+    c: [240, 240],
+    d: [40, 240],
+    house: [240, 360],
+    e: [40, 360],
+  },
+  edges: [['a', 'b'], ['b', 'c'], ['c', 'd'], ['c', 'house'], ['d', 'e']],
+};
+
+function strokeAt(
+  mission: RouteMission,
+  state: RouteState,
+  pointer: Point,
+  trace: { to: string; t: number; recovering: boolean } | null,
+  needsReturn = false,
+  settle = 0,
+) {
+  return followRouteStroke({
+    pointer,
+    trace,
+    needsReturn,
+    node: state.node,
+    nodes: mission.nodes,
+    exits: (from) => mission.edges.flatMap(([x, y]) => x === from ? [y] : y === from ? [x] : []),
+    canEnter: (from, to) => {
+      if (from !== state.node) return false;
+      return checkRouteMove(mission, state, to).ok;
+    },
+    tolerance: 26,
+    settle,
+    onArrive: (to) => { expect(moveOnRoute(mission, state, to).ok).toBe(true); },
+  });
+}
+
+describe('corner tracing', () => {
+  it('continues through two L corners on one stroke without lifting', () => {
+    const state = createRouteState(CORNER_MAP);
+    const first = strokeAt(CORNER_MAP, state, [80, 42], null);
+    expect(first.arrivals).toEqual([]);
+    expect(first.trace?.to).toBe('b');
+
+    const atB = strokeAt(CORNER_MAP, state, [220, 72], first.trace);
+    expect(atB.arrivals).toEqual(['b']);
+    expect(atB.offRoad).toBe(false);
+    expect(state.node).toBe('b');
+    expect(atB.trace?.to).toBe('c');
+
+    const atC = strokeAt(CORNER_MAP, state, [208, 256], atB.trace);
+    expect(atC.arrivals).toEqual(['c']);
+    expect(atC.offRoad).toBe(false);
+    expect(state.node).toBe('c');
+    expect(atC.trace?.to).toBe('d');
+    expect(state.used.has(roadKey('a', 'b'))).toBe(true);
+    expect(state.used.has(roadKey('b', 'c'))).toBe(true);
+    expect(state.used.has(roadKey('c', 'd'))).toBe(false);
+  });
+
+  it('takes the intended T-junction branch when the finger cuts that corner', () => {
+    const state = createRouteState(CORNER_MAP);
+    const along = strokeAt(CORNER_MAP, state, [80, 40], null);
+    const throughB = strokeAt(CORNER_MAP, state, [240, 40], along.trace);
+    expect(throughB.arrivals).toEqual(['b']);
+    const cutTowardHouse = strokeAt(CORNER_MAP, state, [256, 268], { to: 'c', t: .7, recovering: false });
+    expect(cutTowardHouse.arrivals).toEqual(['c']);
+    expect(cutTowardHouse.trace?.to).toBe('house');
+    expect(state.node).toBe('c');
+    expect(state.used.has(roadKey('c', 'house'))).toBe(false);
+  });
+
+  it('does not instantly fail a modest cut-corner, but still flags a clear off-road miss', () => {
+    const state = createRouteState(CORNER_MAP);
+    const along = strokeAt(CORNER_MAP, state, [120, 40], null);
+    const cut = strokeAt(CORNER_MAP, state, [220, 72], along.trace);
+    expect(cut.offRoad).toBe(false);
+    expect(cut.arrivals).toEqual(['b']);
+
+    const lost = strokeAt(CORNER_MAP, state, [120, 160], along.trace);
+    expect(lost.offRoad).toBe(true);
+    expect(lost.arrivals).toEqual([]);
+    expect(lost.trace?.recovering).toBe(true);
+    expect(junctionSlack(26)).toBeGreaterThan(26);
+  });
+
+  it('keeps one-use roads and house order when a stroke arrives at a junction', () => {
+    const state = createRouteState(DELIVERY_MISSION);
+    const start = DELIVERY_MISSION.nodes.start;
+    const a = DELIVERY_MISSION.nodes.a;
+    const towardA: Point = [start[0] + 40, start[1]];
+    const first = strokeAt(DELIVERY_MISSION, state, towardA, null);
+    expect(first.trace?.to).toBe('a');
+    const cutToE: Point = [a[0] - 16, a[1] + 28];
+    const corner = strokeAt(DELIVERY_MISSION, state, cutToE, first.trace);
+    expect(corner.arrivals).toEqual(['a']);
+    expect(state.node).toBe('a');
+    expect(state.used.has(roadKey('start', 'a'))).toBe(true);
+    expect(state.used.size).toBe(1);
+    expect(moveOnRoute(DELIVERY_MISSION, state, 'b').ok).toBe(true);
+    expect(moveOnRoute(DELIVERY_MISSION, state, 'house2')).toEqual({ ok: false, reason: 'wrong-order' });
+    expect(state.delivered).toBe(0);
+  });
+});
+
+describe('delivery tap mode', () => {
+  it('still offers junction buttons and does not require a draw stroke', async () => {
+    const html = await renderToString(createSSRApp({
+      render: () => h(DeliveryBoard, {
+        mission: DELIVERY_MISSION,
+        state: createRouteState(DELIVERY_MISSION),
+        enabled: true,
+        mode: 'tap',
+        hint: null,
+      }),
+    }));
+    expect(html).toContain('data-node="a"');
+    expect(html).toContain('選擇下一個路口');
+    expect(html).toContain('delivery-target');
+    expect(html).not.toContain('class="delivery-board tracing"');
   });
 });

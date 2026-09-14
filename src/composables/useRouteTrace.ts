@@ -1,6 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue';
+import { roadKey } from '../game/graph';
 import { checkRouteMove, routeNeighbors, type RouteFailure, type RouteMission, type RouteState } from '../game/routeMission';
-import { projectToRoad, traceAlongRoad, type RoadTrace } from '../game/trace';
+import { followRouteStroke, type RoadTrace } from '../game/trace';
 import type { Point } from '../game/types';
 
 export function useRouteTrace(options: {
@@ -29,7 +30,7 @@ export function useRouteTrace(options: {
 
   function tolerance(): number {
     const rect = options.surface.value!.getBoundingClientRect();
-    return Math.max(22, 12 / rect.width * options.mission().width);
+    return Math.max(26, 14 / rect.width * options.mission().width);
   }
 
   function stopPointer(): void {
@@ -57,33 +58,34 @@ export function useRouteTrace(options: {
 
   function onPointerMove(event: PointerEvent): void {
     if (pointerId !== event.pointerId || !options.enabled()) return;
-    const pointer = pointerPoint(event);
     const mission = options.mission();
-    const state = options.state();
-    const from = mission.nodes[state.node];
-    if (!trace.value) {
-      if (needsReturn && Math.hypot(pointer[0] - from[0], pointer[1] - from[1]) > tolerance()) {
-        options.feedback('off-road');
-        return;
-      }
-      needsReturn = false;
-      if (Math.hypot(pointer[0] - from[0], pointer[1] - from[1]) < 10) return;
-      const candidate = routeNeighbors(mission, state.node)
-        .map((to) => ({ to, ...projectToRoad(pointer, from, mission.nodes[to]) }))
-        .filter((item) => item.t > 0 && item.distance <= tolerance())
-        .sort((a, b) => a.distance - b.distance)[0];
-      if (!candidate) { needsReturn = true; options.feedback('off-road'); return; }
-      const permitted = checkRouteMove(mission, state, candidate.to);
-      if (!permitted.ok) { options.feedback(permitted.reason); return; }
-      trace.value = { to: candidate.to, t: 0, recovering: false };
-    }
-    const result = traceAlongRoad(trace.value, pointer, from, mission.nodes[trace.value.to], tolerance());
+    const continuing = !!trace.value;
+    const result = followRouteStroke({
+      pointer: pointerPoint(event),
+      trace: trace.value,
+      needsReturn,
+      node: options.state().node,
+      nodes: mission.nodes,
+      exits: (from) => routeNeighbors(mission, from),
+      canEnter: (from, to) => {
+        const state = options.state();
+        if (from === state.node) return checkRouteMove(mission, state, to).ok;
+        const preview = { ...state, node: from, used: new Set(state.used) };
+        preview.used.add(roadKey(state.node, from));
+        if (mission.stops[preview.delivered]?.node === from) preview.delivered += 1;
+        return checkRouteMove(mission, preview, to).ok;
+      },
+      tolerance: tolerance(),
+      settle: continuing ? 0 : 10,
+      onArrive: (to) => options.move(to),
+      shouldContinue: () => options.enabled(),
+    });
     trace.value = result.trace;
+    needsReturn = result.needsReturn;
     if (result.offRoad) options.feedback('off-road');
-    if (result.arrived) {
-      const to = trace.value.to;
-      trace.value = null;
-      options.move(to);
+    if (result.blockedTo) {
+      const blocked = checkRouteMove(mission, options.state(), result.blockedTo);
+      if (!blocked.ok) options.feedback(blocked.reason);
     }
   }
 
