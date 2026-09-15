@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { Component } from 'vue';
+import { computed, type Component } from 'vue';
 import { useMazePlay, type MazeSpeech } from '../composables/useMazePlay';
 import type { OverlayCopy, SessionCopy } from '../game/copy';
+import { mazeLoadBand, STAGE_LABEL, type LoadBand, type ParentGuide } from '../game/stages';
 import type { LevelDef, LevelSource } from '../game/types';
 import MazeOverlays from './MazeOverlays.vue';
 import PlayChrome from './PlayChrome.vue';
@@ -11,6 +12,7 @@ const props = defineProps<{
   picks?: readonly LevelDef[];
   copy: SessionCopy;
   overlayCopy: OverlayCopy;
+  parentCopy: Record<LoadBand, ParentGuide>;
   speech: MazeSpeech;
   board: Component;
   title: string;
@@ -41,6 +43,10 @@ const {
   move, welcomeStart, onHint, toggleSound, onRestart, onJump, onRetry, onNext, onReplay,
   showHelp, onWinRevealed,
 } = play;
+
+const stageBand = computed(() => mazeLoadBand(game.level));
+const stageLabel = computed(() => STAGE_LABEL[stageBand.value]);
+const parentGuide = computed(() => props.parentCopy[stageBand.value]);
 </script>
 
 <template>
@@ -67,7 +73,7 @@ const {
         </button>
         <button
           class="icon-button"
-          aria-label="遊戲說明與關卡選擇"
+          aria-label="遊戲說明"
           title="遊戲說明"
           :disabled="!interactive"
           @click="showHelp"
@@ -83,6 +89,7 @@ const {
       </div>
       <div class="level-badge">
         <span>第 {{ game.level + 1 }} 關</span>
+        <span class="stage-chip">{{ stageLabel }}</span>
         <span v-if="!endless" class="level-dots" aria-hidden="true">
           <i v-for="(_, i) in helpLevels" :key="i" :class="i === game.level ? 'current' : completed.has(i) ? 'complete' : ''"/>
         </span>
@@ -130,6 +137,8 @@ const {
     :reduce-motion="play.session.reduceMotion"
     :help-levels="helpLevels"
     :copy="overlayCopy"
+    :stage-label="stageLabel"
+    :parent-guide="parentGuide"
     @start="welcomeStart"
     @retry="onRetry"
     @next="onNext"

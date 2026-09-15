@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { parentCopy } from '../game/stages';
 import { confettiPalette, overlayCopy, sessionCopy, speech } from '../tooth/copy';
 import { toothCatalog } from '../tooth/levels';
 import GameSprite from './GameSprite.vue';
@@ -18,6 +19,7 @@ const catalog = toothCatalog();
       :catalog="catalog"
       :copy="sessionCopy"
       :overlay-copy="overlayCopy"
+      :parent-copy="parentCopy.tooth"
       :speech="speech"
       :board="ToothBoard"
       :confetti-palette="confettiPalette"

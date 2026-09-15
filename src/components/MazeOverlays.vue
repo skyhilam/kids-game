@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { OverlayCopy } from '../game/copy';
+import { STAGE_PICK_INTRO, type ParentGuide } from '../game/stages';
 import type { LevelDef, Overlay } from '../game/types';
 import MazeDialog from './MazeDialog.vue';
+import ParentGuideBlock from './ParentGuide.vue';
 
 const props = defineProps<{
   overlay: Overlay | null;
@@ -13,6 +15,8 @@ const props = defineProps<{
   reduceMotion: boolean;
   helpLevels: readonly { index: number; level: LevelDef }[];
   copy: OverlayCopy;
+  stageLabel?: string;
+  parentGuide?: ParentGuide | null;
 }>();
 
 const emit = defineEmits<{
@@ -96,6 +100,11 @@ const revealMs = computed(() => {
         <h3>操作</h3>
         <p v-html="copy.help.controls"></p>
       </div>
+      <div class="help-section">
+        <h3>三階段點揀</h3>
+        <p>{{ STAGE_PICK_INTRO }}</p>
+      </div>
+      <ParentGuideBlock v-if="parentGuide" :guide="parentGuide" :stage-label="stageLabel"/>
       <div v-if="helpLevels.length" class="help-section" style="border:0">
         <h3>選擇關卡</h3>
         <div class="help-levels">

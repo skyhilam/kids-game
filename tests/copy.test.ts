@@ -35,7 +35,9 @@ describe('start and arrival copy', () => {
     expect(startGuide(tutorial, 99).announce).toBe(START_GUIDE.tutorial.announce);
 
     expect(startGuide(standard, 0).main).toBe(START_GUIDE.standard.main);
-    expect(startGuide(standard, 1).sub).toContain(standard.name);
+    expect(startGuide(standard, 1).sub).toContain('第 2 關 · 基礎');
+    expect(startGuide(standard, 1).sub).not.toContain(standard.name);
+    expect(startGuide(standard, 8).sub).toContain('益智');
     expect(startGuide({ ...standard, tutorial: true }, 1).main).toBe(START_GUIDE.tutorial.main);
   });
 

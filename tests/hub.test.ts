@@ -20,4 +20,12 @@ describe('hub landing metadata', () => {
     expect(check).toContain("title.includes('小小出遊家')");
     expect(check).not.toMatch(/title\.includes\('一起去野餐'\)/);
   });
+
+  it('shows the three-stage overview on every card and the delivery tap-first tip', () => {
+    const hub = readFileSync(join(root, 'src/components/Hub.vue'), 'utf8');
+    expect([...hub.matchAll(/class="hub-stages"/g)]).toHaveLength(3);
+    expect(hub).toMatch(/STAGE_OVERVIEW/);
+    expect(hub).toMatch(/可先點選，再試畫線/);
+    expect(hub).not.toMatch(/貼紙冊|100 枚|智商|智力|大腦/);
+  });
 });
