@@ -2,7 +2,7 @@
 import { computed, type Component } from 'vue';
 import { useMazePlay, type MazeSpeech } from '../composables/useMazePlay';
 import type { OverlayCopy, SessionCopy } from '../game/copy';
-import { mazeLoadBand, STAGE_LABEL, type ParentGuide } from '../game/stages';
+import { mazeLoadBand, STAGE_LABEL, type LoadBand, type ParentGuide } from '../game/stages';
 import type { LevelDef, LevelSource } from '../game/types';
 import MazeOverlays from './MazeOverlays.vue';
 import PlayChrome from './PlayChrome.vue';
@@ -12,7 +12,7 @@ const props = defineProps<{
   picks?: readonly LevelDef[];
   copy: SessionCopy;
   overlayCopy: OverlayCopy;
-  parentCopy: Record<'easy' | 'basic' | 'puzzle', ParentGuide>;
+  parentCopy: Record<LoadBand, ParentGuide>;
   speech: MazeSpeech;
   board: Component;
   title: string;
