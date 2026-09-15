@@ -4,10 +4,12 @@ import { usePlayAudio } from '../composables/usePlayAudio';
 import { deliveryMission } from '../delivery/generate';
 import { cancelSpeech, initAudio, playCue, speak } from '../game/audio';
 import { createRouteState, findRouteSolution, moveOnRoute, type RouteFailure, type RouteMission } from '../game/routeMission';
+import { deliveryLoadBand, parentCopy, STAGE_LABEL } from '../game/stages';
 import type { Point } from '../game/types';
 import DeliveryBoard from './DeliveryBoard.vue';
 import GameSprite from './GameSprite.vue';
 import MazeDialog from './MazeDialog.vue';
+import ParentGuide from './ParentGuide.vue';
 import PlayChrome from './PlayChrome.vue';
 
 const SPEECH = {
@@ -35,6 +37,8 @@ const mission = computed<RouteMission>(() => {
 });
 const enabled = computed(() => !overlay.value && !state.won && !state.stalled);
 const nextStop = computed(() => mission.value.stops[state.delivered]?.label ?? '藍色終點');
+const stageName = computed(() => STAGE_LABEL[deliveryLoadBand(source)]);
+const deliveryGuide = parentCopy.delivery;
 const dialogTitle = computed(() => overlay.value === 'welcome' ? '小小送貨員，出發！'
   : overlay.value === 'help' ? '這次怎樣送貨？'
     : overlay.value === 'win' ? '包裹都送到了！' : '停一停，再想一條路');
@@ -136,6 +140,7 @@ onUnmounted(() => window.removeEventListener('resize', resize));
       <div class="brand">
         <div class="brand-logo" aria-hidden="true"><GameSprite name="truck"/></div>
         <div><div class="eyebrow">小 小 出 遊 家</div><h1>送貨員來了</h1></div>
+        <span class="stage-chip">{{ stageName }}</span>
       </div>
       <div class="top-actions">
         <button class="action-button" @click="emit('home')">選擇遊戲</button>
@@ -196,6 +201,7 @@ onUnmounted(() => window.removeEventListener('resize', resize));
     <div class="dialog-inner">
       <div class="dialog-eyebrow">{{ overlay === 'win' ? '任 務 完 成' : '觀 察 · 順 序 · 畫 線' }}</div>
       <h2 id="delivery-dialog-title" class="dialog-title">{{ dialogTitle }}</h2>
+      <p v-if="overlay === 'welcome' || overlay === 'help'" class="stage-chip delivery-dialog-stage">這一張 · {{ stageName }}</p>
       <GameSprite class="delivery-hero" :name="overlay === 'win' ? 'courier' : 'truck'"/>
       <template v-if="overlay === 'welcome' || overlay === 'help'">
         <ol class="delivery-rules">
@@ -203,7 +209,11 @@ onUnmounted(() => window.removeEventListener('resize', resize));
           <li><span>2</span><div>依序送到 1 → 2 → 3 號屋<strong>到達房子，包裹便會自動送到。</strong></div></li>
           <li><span>3</span><div>送完，再到藍色終點<strong>同一段路不能走兩次，反方向也不行。</strong></div></li>
         </ol>
-        <details class="delivery-parent"><summary>給家長的小提示</summary><p>先一起找起點、三間屋和終點。問孩子：「先去邊間屋？返程有冇另一條路？」第一次可用點選路口；想畫線時，再用手指或觸控筆慢慢走。可以重經路口，但不能重走已變橙色的路段。</p></details>
+        <ParentGuide :guide="deliveryGuide"/>
+        <details class="delivery-parent">
+          <summary>點選較易／描線多手眼</summary>
+          <p>{{ deliveryGuide.load }}</p>
+        </details>
         <button class="primary-button" @click="closeHelpOrStart">{{ overlay === 'welcome' ? '開始送貨' : '繼續送貨' }}</button>
         <button class="secondary-button" type="button" @click="emit('home')">選擇遊戲</button>
       </template>
@@ -230,7 +240,7 @@ onUnmounted(() => window.removeEventListener('resize', resize));
 
 <style>
 .app.delivery-game{--delivery-blue:#568aa2;max-width:1020px;min-width:0}
-.delivery-game .brand-logo{background:#e1edf0}.delivery-game .brand-logo svg{height:43px}
+.delivery-game .brand-logo{background:#e1edf0}.delivery-game .brand-logo svg{height:43px}.delivery-game .brand{flex-wrap:wrap}.delivery-game .stage-chip{align-self:center}.delivery-dialog-stage{margin:0 auto 8px}
 .delivery-manifest{display:flex;gap:24px;align-items:center;padding:16px 22px;background:var(--paper);border:1px solid #e3e7d9;border-radius:23px;box-shadow:var(--shadow)}
 .delivery-manifest-label{flex:none;color:#87927c;font-size:11px;letter-spacing:1px}.delivery-manifest-label strong{display:block;color:#547563;font-size:25px;margin-top:4px}.delivery-manifest-label small{font-size:13px;color:#87927c}
 .delivery-stops{list-style:none;margin:0;padding:0;display:flex;flex:1;justify-content:space-between;gap:8px}.delivery-stops li{display:flex;align-items:center;gap:9px;padding:9px;border-radius:15px;color:#8a9681;font-size:14px}.delivery-stops small{display:block;font-size:10px;margin-top:4px;white-space:nowrap}.delivery-stops li.current{background:#fbefce;color:#886730}.delivery-stops li.delivered{color:#4f7c61}.delivery-number{width:33px;height:33px;display:grid;place-items:center;background:#edf0e4;border-radius:50%;font-size:21px;font-weight:850}.current .delivery-number{background:#edcb7e;color:#785921}.delivered .delivery-number{background:#dfecdd;color:#527a56}.delivery-finish-step .delivery-number{background:#e0edf2;color:#568aa2}

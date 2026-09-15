@@ -451,6 +451,10 @@ describe('dialog wiring', () => {
     expect(overlays).toMatch(/overlay\?\.kind === 'win'/);
     expect(overlays).toMatch(/overlay\?\.kind === 'help'/);
     expect(overlays).toMatch(/overlay\?\.kind === 'rescue'/);
+    expect(overlays).toMatch(/三階段點揀/);
+    expect(overlays).toMatch(/ParentGuideBlock/);
+    expect(overlays).toMatch(/v-if="helpLevels.length"/);
+    expect(overlays).toMatch(/選擇關卡/);
     expect(overlays).toMatch(/id="rescueBtn"[^>]*@click="emit\('retry'\)"/);
     expect(overlays).not.toMatch(/emit\('rescue'\)/);
     expect(overlays).not.toMatch(/kind: 'play'/);
@@ -514,6 +518,11 @@ describe('dialog wiring', () => {
     expect(deliveryBoard).toMatch(/houseAbove\(stop\.node\) \? -115 : 20/);
     expect(deliveryBoard).toMatch(/houseAbove\(stop\.node\) \? -48 : 71/);
     expect(deliveryBoard).not.toMatch(/index === 1 \? -115/);
+    expect(delivery).toMatch(/這一張 · \{\{ stageName \}\}/);
+    expect(delivery).toMatch(/deliveryLoadBand\(source\)/);
+    expect(delivery).toMatch(/<ParentGuide/);
+    expect(delivery).toMatch(/點選較易／描線多手眼/);
+    expect(delivery).not.toMatch(/給家長的小提示/);
     expect(delivery).toMatch(/<MazeDialog/);
     expect(delivery).toMatch(/:cancelable="overlay === 'help'"/);
     expect(delivery).toMatch(
@@ -558,6 +567,11 @@ describe('dialog wiring', () => {
     expect(mazePlay).toMatch(/#win-hero/);
     expect(mazePlay).toMatch(/#rescue-hero/);
     expect(mazePlay).toMatch(/:copy="overlayCopy"/);
+    expect(mazePlay).toMatch(/:parent-guide="parentGuide"/);
+    expect(mazePlay).toMatch(/stage-chip/);
+    expect(mazePlay).toMatch(/第 \{\{ game.level \+ 1 \}\} 關/);
+    expect(mazePlay).toMatch(/aria-label="遊戲說明"/);
+    expect(mazePlay).not.toMatch(/關卡選擇/);
     expect(mazePlay).toMatch(/@start="welcomeStart"/);
     expect(mazePlay).toMatch(/@retry="onRetry"/);
     expect(mazePlay).toMatch(/@next="onNext"/);
@@ -584,6 +598,8 @@ describe('dialog wiring', () => {
     expect(toothPlay).toMatch(/ToothBoard/);
     expect(picnicPlay).toMatch(/:overlay-copy="overlayCopy"/);
     expect(toothPlay).toMatch(/:overlay-copy="overlayCopy"/);
+    expect(picnicPlay).toMatch(/:parent-copy="parentCopy.picnic"/);
+    expect(toothPlay).toMatch(/:parent-copy="parentCopy.tooth"/);
     expect(picnicPlay).toMatch(/:confetti-palette="confettiPalette"/);
     expect(toothPlay).toMatch(/:confetti-palette="confettiPalette"/);
     expect(picnicPlay).toMatch(/#welcome-hero/);

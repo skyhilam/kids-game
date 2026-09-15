@@ -2,6 +2,7 @@ import { firstValid, generateGridMaze, type Grid } from './gridMaze';
 import { makeGraph } from './graph';
 import { mixSeed, mulberry32, pick, shuffle } from './rng';
 import { findSolution } from './rules';
+import { mazeLoadBand } from './stages';
 import type { LevelDef, NodeId, Point } from './types';
 
 export type MazeKind = 'picnic' | 'tooth';
@@ -36,8 +37,9 @@ function hypot(a: Point, b: Point): number {
 
 function gridFor(kind: MazeKind, index: number, rand: () => number): Grid {
   const roll = rand();
-  if (index === 0) return GRID_3x2;
-  if (index < 8) return roll < 0.42 ? GRID_3x2 : GRID_3x3;
+  const band = mazeLoadBand(index);
+  if (band === 'easy') return GRID_3x2;
+  if (band === 'basic') return roll < 0.42 ? GRID_3x2 : GRID_3x3;
   if (kind === 'picnic' && roll > 0.7) return GRID_4x3;
   if (kind === 'tooth' && roll > 0.78) return GRID_4x3;
   if (roll < 0.2) return GRID_3x2;

@@ -206,6 +206,7 @@ describe('endless maze maps', () => {
     expect(src).toMatch(/^export function generateMaze\(/m);
     expect(src).toMatch(/generateGridMaze\(/);
     expect(src).toMatch(/firstValid\(/);
+    expect(src).toMatch(/mazeLoadBand\(/);
     expect(src).not.toMatch(/export function makeRng/);
     expect(src).not.toMatch(/export function hypot/);
     expect(src).not.toMatch(/export function pick/);

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { parentCopy } from '../game/stages';
 import { confettiPalette, overlayCopy, sessionCopy, speech } from '../picnic/copy';
 import { picnicCatalog } from '../picnic/levels';
 import GameSprite from './GameSprite.vue';
@@ -17,6 +18,7 @@ const catalog = picnicCatalog();
     :catalog="catalog"
     :copy="sessionCopy"
     :overlay-copy="overlayCopy"
+    :parent-copy="parentCopy.picnic"
     :speech="speech"
     :board="PicnicBoard"
     :confetti-palette="confettiPalette"

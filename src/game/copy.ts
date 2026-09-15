@@ -1,4 +1,5 @@
 import type { GraphLabels } from './graph';
+import { mazeLoadBand, STAGE_LABEL } from './stages';
 import type { Graph, MoveOk, StallReason } from './types';
 
 export type GuideLine = { main: string; sub: string };
@@ -39,7 +40,7 @@ export function startGuideFrom(
   if (graph.tutorial) return { ...lines.tutorial };
   return {
     main: lines.standard.main,
-    sub: `第 ${levelIndex + 1} 關 · ${graph.name}。橙色道路表示已經通行。`,
+    sub: `第 ${levelIndex + 1} 關 · ${STAGE_LABEL[mazeLoadBand(levelIndex)]}。橙色道路表示已經通行。`,
     announce: lines.standard.announce,
   };
 }

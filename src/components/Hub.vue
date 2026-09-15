@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { STAGE_OVERVIEW } from '../game/stages';
 import GameSprite from './GameSprite.vue';
 const emit = defineEmits<{
   pick: [activity: 'picnic' | 'tooth' | 'delivery'];
@@ -27,6 +28,7 @@ const emit = defineEmits<{
         </svg>
         <strong>一起去野餐</strong>
         <span>先到漢堡店，再前往公園。</span>
+        <small class="hub-stages">{{ STAGE_OVERVIEW }}</small>
       </button>
       <button class="hub-card" type="button" @click="emit('pick', 'delivery')">
         <svg class="hub-art" viewBox="0 0 220 120" aria-hidden="true">
@@ -38,6 +40,8 @@ const emit = defineEmits<{
         </svg>
         <strong>送貨員來了</strong>
         <span>畫線送到 1、2、3 號屋，再到終點。</span>
+        <small class="hub-stages">{{ STAGE_OVERVIEW }}</small>
+        <small class="hub-modes">可先點選，再試畫線</small>
       </button>
       <button class="hub-card" type="button" @click="emit('pick', 'tooth')">
         <svg class="hub-art" viewBox="0 0 220 120" aria-hidden="true">
@@ -51,6 +55,7 @@ const emit = defineEmits<{
         </svg>
         <strong>打敗蛀牙蟲</strong>
         <span>走到終點，途中避開蛀牙蟲。</span>
+        <small class="hub-stages">{{ STAGE_OVERVIEW }}</small>
       </button>
     </div>
   </main>
