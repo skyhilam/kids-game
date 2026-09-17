@@ -75,6 +75,13 @@ describe('shared play cues', () => {
     expect(delivery).toContain("soundOn ? '關閉音效' : '開啟音效'");
     expect(delivery).toContain('#i-sound');
     expect(delivery).toContain('#i-muted');
+
+    const sticker = readFileSync(join(root, 'src/components/StickerPlay.vue'), 'utf8');
+    expect(sticker).toContain('usePlayAudio');
+    expect(sticker).toContain("soundOn ? '關閉音效' : '開啟音效'");
+    expect(sticker).toContain('speakEnglish');
+    expect(sticker).toContain('#i-sound');
+    expect(sticker).not.toMatch(/speak\(soundOn\.value,\s*id\)/);
   });
 });
 
@@ -181,5 +188,31 @@ describe('mute gates synthesis and speech', () => {
     expect(speech.speak).toHaveBeenCalledOnce();
     cancelSpeech();
     expect(speech.cancel).toHaveBeenCalled();
+  });
+
+  it('reads English words with an English voice and never assigns Cantonese', async () => {
+    speech.getVoices = () => [
+      { lang: 'zh-HK', name: 'Sinji' } as SpeechSynthesisVoice,
+      { lang: 'en-US', name: 'Samantha' } as SpeechSynthesisVoice,
+    ];
+    const { speakEnglish } = await import('../src/game/audio');
+    speakEnglish(true, 'burger');
+    expect(speech.speak).toHaveBeenCalledOnce();
+    const uttered = speech.speak.mock.calls[0]![0] as SpeechSynthesisUtterance;
+    expect(uttered.text).toBe('burger');
+    expect(uttered.lang).toMatch(/^en/i);
+    expect(uttered.voice?.lang).toMatch(/^en/i);
+    expect(uttered.voice?.lang).not.toMatch(/zh-HK|yue/i);
+  });
+
+  it('does not attach a Cantonese voice when speaking English without an English voice', async () => {
+    speech.getVoices = () => [{ lang: 'zh-HK', name: 'Sinji' } as SpeechSynthesisVoice];
+    const { speakEnglish } = await import('../src/game/audio');
+    speakEnglish(true, 'car');
+    expect(speech.speak).toHaveBeenCalledOnce();
+    const uttered = speech.speak.mock.calls[0]![0] as SpeechSynthesisUtterance;
+    expect(uttered.text).toBe('car');
+    expect(uttered.lang).toMatch(/^en/i);
+    expect(uttered.voice).toBeNull();
   });
 });

@@ -28,4 +28,15 @@ describe('hub landing metadata', () => {
     expect(hub).toMatch(/可先點選，再試畫線/);
     expect(hub).not.toMatch(/貼紙冊|100 枚|智商|智力|大腦/);
   });
+
+  it('adds 貼紙學單字 as a fourth card with a new activity key', () => {
+    const hub = readFileSync(join(root, 'src/components/Hub.vue'), 'utf8');
+    const app = readFileSync(join(root, 'src/App.vue'), 'utf8');
+    expect(hub).toMatch(/<strong>貼紙學單字<\/strong>/);
+    expect(hub).toMatch(/拖貼紙配英文詞，全部放對就過關/);
+    expect(hub).toMatch(/emit\('pick', 'sticker'\)/);
+    expect(app).toMatch(/'hub' \| 'picnic' \| 'tooth' \| 'delivery' \| 'sticker'/);
+    expect(app).toMatch(/StickerPlay/);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(4);
+  });
 });
