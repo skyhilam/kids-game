@@ -281,7 +281,10 @@ onUnmounted(() => {
             >
               <GameSprite :name="placed[word]!" :label="WORD_ZH[placed[word]!]" />
             </button>
-            <span class="word-label">{{ word }}</span>
+            <span class="word-label">
+              {{ word }}
+              <small v-if="placed[word] && drag?.id !== placed[word]" aria-hidden="true">✓</small>
+            </span>
           </div>
         </div>
         <div class="sticker-tray" :aria-label="copy.trayLabel">
@@ -412,14 +415,16 @@ onUnmounted(() => {
 .words-game .brand-logo{background:#f3ead4}
 .words-game .brand{flex-wrap:wrap}
 .words-game .stage-chip{align-self:center}
-.words-board{background:#e8f0dc;display:flex;flex-direction:column;gap:16px;padding:42px 18px 16px;aspect-ratio:840/700}
+.board.words-board{background:#e8f0dc;display:flex;flex-direction:column;gap:16px;padding:42px 18px 16px;aspect-ratio:auto;height:auto;min-height:560px;overflow:visible}
 .words-board .board-note{top:12px}
+.words-dialog{width:min(640px,calc(100vw - 32px))}
 .word-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;flex:1}
-.word-slot{min-height:0;border:2px dashed #c5d2b3;border-radius:22px;background:#f7faf0cc;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:8px 8px 10px;position:relative;transition:border-color .2s,background .2s,transform .2s}
-.word-slot.filled{border-style:solid;border-color:#b7d0a4;background:#fffdf8}
+.word-slot{min-height:0;border:2px dashed #c5d2b3;border-radius:22px;background:#f7faf0cc;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 8px;position:relative;transition:border-color .2s,background .2s,transform .2s}
+.word-slot.filled{border-style:solid;border-color:#b7d0a4;background:#fffdf8;justify-content:flex-end}
 .word-slot.over{border-color:#e6a557;background:#fff6df}
 .word-slot.shake{animation:words-shake .4s ease}
-.word-label{font-size:18px;letter-spacing:.6px;color:#4f6b4c;font-weight:850}
+.word-label{font-size:22px;letter-spacing:.6px;color:#4f6b4c;font-weight:850;display:flex;align-items:center;gap:6px}
+.word-label small{width:18px;height:18px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;display:grid;place-items:center}
 .slot-sticker,.sticker-chip{width:100%;height:auto;background:transparent;padding:0;display:grid;place-items:center;touch-action:none}
 .slot-sticker{flex:1;min-height:64px}
 .slot-sticker svg,.sticker-chip svg{width:72px;height:64px}
@@ -431,9 +436,12 @@ onUnmounted(() => {
 .words-dialog .stage-chip{margin:0 auto 10px}
 @keyframes words-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 @media(max-width:700px){
-  .words-board{padding-top:38px;gap:12px}
-  .word-slots{gap:8px}
-  .word-label{font-size:14px}
+  .board.words-board{min-height:0;padding:16px 12px 12px;gap:12px}
+  .words-board .board-note{display:none}
+  .word-slots{flex:none;gap:8px}
+  .word-slot{min-height:112px}
+  .word-label{font-size:16px}
+  .slot-sticker{min-height:56px}
   .slot-sticker svg,.sticker-chip svg{width:56px;height:50px}
   .sticker-tray{grid-template-columns:repeat(3,minmax(0,1fr))}
   .tray-slot{min-height:70px}
