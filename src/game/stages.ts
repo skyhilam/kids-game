@@ -35,7 +35,7 @@ export function stageLabel(band: LoadBand): string {
   return STAGE_LABEL[band];
 }
 
-/** Reserved for later word-set stages; v1 play always shows 簡單. */
+/** Same picnic/brush bands: 0 easy, 1–7 basic, 8+ puzzle. */
 export function stickerLoadBand(index = 0): LoadBand {
   return mazeLoadBand(index);
 }
@@ -86,17 +86,17 @@ export const parentCopy = {
   },
   sticker: {
     easy: {
-      goal: '圖詞配對練習',
+      goal: '用 4 張圖練習圖詞配對。',
       ask: '呢張圖係咩？邊個英文詞？',
       show: '家長拖一張放對後交返孩子',
     },
     basic: {
-      goal: '圖詞配對練習',
+      goal: '用 5 張圖練習圖詞配對。',
       ask: '呢張圖係咩？邊個英文詞？',
       show: '家長拖一張放對後交返孩子',
     },
     puzzle: {
-      goal: '圖詞配對練習',
+      goal: '用 6 張圖練習圖詞配對。',
       ask: '呢張圖係咩？邊個英文詞？',
       show: '家長拖一張放對後交返孩子',
     },

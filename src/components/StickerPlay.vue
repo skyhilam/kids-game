@@ -3,7 +3,7 @@ import { computed, onUnmounted, reactive, ref } from 'vue';
 import { usePlayAudio } from '../composables/usePlayAudio';
 import { cancelSpeech, initAudio, playCue, speakEnglish } from '../game/audio';
 import { randomSeed } from '../game/rng';
-import { parentCopy, STAGE_LABEL } from '../game/stages';
+import { parentCopy, STAGE_LABEL, stickerLoadBand } from '../game/stages';
 import { STICKER_COPY as copy } from '../sticker/copy';
 import {
   dealBoard,
@@ -26,15 +26,18 @@ const emit = defineEmits<{ home: [] }>();
 const { soundOn, toastText, toastOn, toast, toggleSound } = usePlayAudio();
 
 const overlay = ref<'welcome' | 'help' | 'win' | null>('welcome');
-const board = ref<StickerDeal>(dealBoard(randomSeed()));
+const level = ref(0);
+const board = ref<StickerDeal>(dealBoard(randomSeed(), 0));
 const placed = reactive<PlacedMap>({});
 const shakeSlot = ref<WordId | null>(null);
 const message = ref<string>(copy.guideMain);
 const confettiBits = ref<{ i: number; left: string; bg: string; delay: string; duration: string; round: boolean; drift: string }[]>([]);
 let shakeTimer = 0;
 let confettiTimer = 0;
-const stageLabel = STAGE_LABEL.easy;
-const guide = parentCopy.sticker.easy;
+const stageBand = computed(() => stickerLoadBand(level.value));
+const stageLabel = computed(() => STAGE_LABEL[stageBand.value]);
+const guide = computed(() => parentCopy.sticker[stageBand.value]);
+const words = computed(() => board.value.slots);
 const reduceMotion = typeof window !== 'undefined'
   && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -46,8 +49,10 @@ const drag = ref<{
   over: WordId | null;
 } | null>(null);
 
-const matched = computed(() => placedCount(placed));
+const matched = computed(() => placedCount(placed, words.value));
 const playing = computed(() => overlay.value === null);
+const slotColumns = computed(() => words.value.length === 4 ? 2 : 3);
+const trayColumns = computed(() => words.value.length);
 
 function resetPlaced(): void {
   for (const id of WORD_IDS) delete placed[id];
@@ -60,8 +65,9 @@ function applyPlaced(next: PlacedMap): void {
   }
 }
 
-function reshuffle(): void {
-  board.value = dealBoard(randomSeed());
+function dealLevel(nextLevel: number): void {
+  level.value = nextLevel;
+  board.value = dealBoard(randomSeed(), nextLevel);
   resetPlaced();
   message.value = copy.guideMain;
   overlay.value = null;
@@ -114,7 +120,7 @@ function finishDrag(event: PointerEvent): void {
     applyPlaced(lift(placed, id));
     return;
   }
-  const result = tryPlace(placed, slot, id);
+  const result = tryPlace(placed, slot, id, words.value);
   if (result.kind === 'correct') {
     applyPlaced(result.placed);
     playCue(soundOn.value, 'collect');
@@ -166,9 +172,14 @@ function showHelp(): void {
   overlay.value = 'help';
 }
 
+function nextLevel(): void {
+  playCue(soundOn.value, 'restart');
+  dealLevel(level.value + 1);
+}
+
 function replay(): void {
   playCue(soundOn.value, 'restart');
-  reshuffle();
+  dealLevel(level.value);
 }
 
 function clearConfetti(): void {
@@ -212,7 +223,7 @@ onUnmounted(() => {
           <div class="eyebrow">小 小 出 遊 家</div>
           <h1>{{ copy.title }}</h1>
         </div>
-        <span class="stage-chip" data-stage="簡單">{{ stageLabel }}</span>
+        <span class="stage-chip" :data-stage="stageLabel">{{ stageLabel }}</span>
       </div>
       <div class="top-actions">
         <button class="action-button" type="button" @click="emit('home')">選擇遊戲</button>
@@ -240,7 +251,7 @@ onUnmounted(() => {
     <section class="mission" aria-label="任務：拖貼紙配英文詞，全部放對就過關">
       <div class="mission-label">今日小任務</div>
       <div class="mission-steps">
-        <div class="mission-step" :class="matched === WORD_IDS.length ? 'done' : 'active'">
+        <div class="mission-step" :class="matched === words.length ? 'done' : 'active'">
           <div class="step-icon"><GameSprite aria-hidden="true" name="sun"/></div>
           <div class="step-copy">
             <small>圖詞配對</small>
@@ -249,15 +260,21 @@ onUnmounted(() => {
         </div>
       </div>
       <div class="level-badge">
-        <span>{{ matched }} / {{ WORD_IDS.length }}</span>
-        <span class="stage-chip">{{ stageLabel }}</span>
+        <span>第 {{ level + 1 }} 關</span>
+        <span class="stage-chip" :data-stage="stageLabel">{{ stageLabel }}</span>
+        <span>{{ matched }} / {{ words.length }}</span>
       </div>
     </section>
 
     <div class="board-frame">
       <div class="board words-board" :class="{ dragging: Boolean(drag) }">
         <p class="board-note">把貼紙拖到英文詞上</p>
-        <div class="word-slots" role="list" :aria-label="copy.slotsLabel">
+        <div
+          class="word-slots"
+          role="list"
+          :aria-label="copy.slotsLabel"
+          :style="{ gridTemplateColumns: `repeat(${slotColumns}, minmax(0, 1fr))` }"
+        >
           <div
             v-for="word in board.slots"
             :key="word"
@@ -287,7 +304,11 @@ onUnmounted(() => {
             </span>
           </div>
         </div>
-        <div class="sticker-tray" :aria-label="copy.trayLabel">
+        <div
+          class="sticker-tray"
+          :aria-label="copy.trayLabel"
+          :style="{ gridTemplateColumns: `repeat(${trayColumns}, minmax(0, 1fr))` }"
+        >
           <div
             v-for="word in board.tray"
             :key="word"
@@ -313,7 +334,7 @@ onUnmounted(() => {
         <div class="guide-avatar" aria-hidden="true"><GameSprite name="bear"/></div>
         <div class="guide-copy">
           <div class="guide-main" role="status" aria-live="polite">{{ message }}</div>
-          <div class="guide-sub">{{ copy.guideSub }}</div>
+          <div class="guide-sub">第 {{ level + 1 }} 關 · {{ stageLabel }}。{{ copy.guideSub }}</div>
         </div>
       </div>
     </section>
@@ -349,7 +370,7 @@ onUnmounted(() => {
           <GameSprite name="sun" x="312" y="22" width="90" height="90"/>
         </svg>
         <h2 id="sticker-dialog-title" class="dialog-title">{{ copy.title }}</h2>
-        <p class="stage-chip">{{ stageLabel }}</p>
+        <p class="stage-chip" :data-stage="stageLabel">第 {{ level + 1 }} 關 · {{ stageLabel }}</p>
         <p class="dialog-copy">{{ copy.welcomeBody }}</p>
         <button class="primary-button" type="button" autofocus @click="beginPlay">
           {{ copy.start }}<svg><use href="#i-arrow"/></svg>
@@ -396,9 +417,10 @@ onUnmounted(() => {
         </svg>
         <h2 id="sticker-dialog-title" class="dialog-title">{{ copy.winTitle }}</h2>
         <p class="dialog-copy">{{ copy.winBody }}</p>
-        <button class="primary-button" type="button" autofocus @click="replay">
-          再玩<svg viewBox="0 0 32 32"><use href="#i-restart"/></svg>
+        <button class="primary-button" type="button" autofocus @click="nextLevel">
+          下一關<svg><use href="#i-arrow"/></svg>
         </button>
+        <button class="secondary-button" type="button" @click="replay">{{ copy.replay }}</button>
         <button class="secondary-button" type="button" @click="emit('home')">回 Hub</button>
       </template>
     </div>
