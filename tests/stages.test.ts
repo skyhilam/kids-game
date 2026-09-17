@@ -8,6 +8,7 @@ import {
   STAGE_LABEL,
   STAGE_OVERVIEW,
   STAGE_PICK_INTRO,
+  stickerLoadBand,
 } from '../src/game/stages';
 
 const claims = /貼紙冊|100 枚|智商|智力|大腦|腦部|年齡標準/;
@@ -55,6 +56,11 @@ describe('generator load bands and parent copy', () => {
     expect(parentCopy.delivery.load).toContain('點選較易入手');
     expect(STAGE_PICK_INTRO).toContain('三個階段');
     expect(STAGE_PICK_INTRO).toContain('不是年齡分級');
+    expect(stickerLoadBand(0)).toBe('easy');
+    expect(stickerLoadBand(3)).toBe(mazeLoadBand(3));
+    expect(parentCopy.sticker.easy.goal).toBe('圖詞配對練習');
+    expect(parentCopy.sticker.easy.ask).toContain('呢張圖係咩');
+    expect(parentCopy.sticker.easy.show).toContain('家長拖一張放對後交返孩子');
     expect(JSON.stringify({ parentCopy, STAGE_PICK_INTRO })).not.toMatch(claims);
   });
 });

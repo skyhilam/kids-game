@@ -130,6 +130,44 @@ export function speak(soundOn: boolean, text: string): void {
   }
 }
 
+function isCantoneseVoice(item: SpeechSynthesisVoice): boolean {
+  return /^(zh[-_]HK|yue)([-_]|$)/i.test(item.lang)
+    || /cantonese|廣東話|粤语|粵語/i.test(item.name);
+}
+
+export function pickEnglishVoice(): SpeechSynthesisVoice | null {
+  try {
+    const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+    return voices.find((item) => /^en([-_]|$)/i.test(item.lang) && !isCantoneseVoice(item))
+      || voices.find((item) => /english/i.test(item.name) && !isCantoneseVoice(item))
+      || null;
+  } catch {
+    return null;
+  }
+}
+
+/** English word TTS. Never assigns a Cantonese voice to English text. */
+export function speakEnglish(soundOn: boolean, text: string): void {
+  if (!soundOn || !window.speechSynthesis) return;
+  try {
+    const english = pickEnglishVoice();
+    window.speechSynthesis.cancel();
+    const message = new SpeechSynthesisUtterance(text);
+    if (english) {
+      message.voice = english;
+      message.lang = /^en([-_]|$)/i.test(english.lang) ? english.lang : 'en-US';
+    } else {
+      message.lang = 'en-US';
+    }
+    message.rate = 0.88;
+    message.pitch = 1.05;
+    message.volume = 0.85;
+    window.speechSynthesis.speak(message);
+  } catch {
+    /* Speech is optional. */
+  }
+}
+
 export function cancelSpeech(): void {
   try {
     if (window.speechSynthesis) window.speechSynthesis.cancel();

@@ -35,6 +35,11 @@ export function stageLabel(band: LoadBand): string {
   return STAGE_LABEL[band];
 }
 
+/** Reserved for later word-set stages; v1 play always shows 簡單. */
+export function stickerLoadBand(index = 0): LoadBand {
+  return mazeLoadBand(index);
+}
+
 export const STAGE_PICK_INTRO =
   '地圖分簡單、基礎、益智三個階段。階段只說明這回路徑同思考負荷，方便按孩子當下狀態點揀，不是年齡分級，也不是能力評分。';
 
@@ -79,8 +84,26 @@ export const parentCopy = {
     show: '第一次用「點選路口」行頭一段；之後鼓勵改試畫線。可重經路口，唔好重行橙色路段。唔催速、唔計時。',
     load: '點選較易入手；沿路描線多一手眼協調。依孩子狀態揀，唔係評分。',
   },
+  sticker: {
+    easy: {
+      goal: '圖詞配對練習',
+      ask: '呢張圖係咩？邊個英文詞？',
+      show: '家長拖一張放對後交返孩子',
+    },
+    basic: {
+      goal: '圖詞配對練習',
+      ask: '呢張圖係咩？邊個英文詞？',
+      show: '家長拖一張放對後交返孩子',
+    },
+    puzzle: {
+      goal: '圖詞配對練習',
+      ask: '呢張圖係咩？邊個英文詞？',
+      show: '家長拖一張放對後交返孩子',
+    },
+  },
 } as const satisfies {
   picnic: Record<LoadBand, ParentGuide>;
   tooth: Record<LoadBand, ParentGuide>;
   delivery: ParentGuide & { load: string };
+  sticker: Record<LoadBand, ParentGuide>;
 };
