@@ -67,7 +67,7 @@ const emit = defineEmits<{
         </svg>
         <strong>貼紙學單字</strong>
         <span>拖貼紙配英文詞，全部放對就過關</span>
-        <small class="hub-modes">簡單 · 圖詞配對</small>
+        <small class="hub-modes">{{ STAGE_OVERVIEW }} · 圖詞配對</small>
       </button>
     </div>
   </main>
