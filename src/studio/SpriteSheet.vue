@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { motions, sheetLayout, type SheetSettings } from './animation';
 import type { StudioContext } from './catalog';
 import { download, pngBlob } from './download';
 import { fileStem, parseRecipe, type Recipe } from './recipe';
 import { renderSheet, sheetMetadata, sheetPack } from './sheet';
-import { actionDescription, generatedFrames, generationBusy, hasBuiltInAction, hasGeneratedAction, readJob, serviceStatus, sourceKey, submitAnimation, waitForAnimation, type GenerationJob } from './generation';
+import { actionDescription, generatedFrames, generationBusy, hasBuiltInAction, hasGeneratedAction, readJob, releaseUncertainAnimation, serviceStatus, sourceKey, submitAnimation, waitForAnimation, type GenerationJob } from './generation';
 
 const props = defineProps<{ recipe: Recipe; context: StudioContext }>();
 const emit = defineEmits<{ 'update:sheet': [value: SheetSettings] }>();
@@ -14,6 +14,7 @@ const current = ref(0); const playing = ref(false); const ready = ref(false);
 const exporting = ref(false); const message = ref(''); const error = ref('');
 const configured = ref(false); const checking = ref(true); const activeId = ref<string | null>(null);
 const apiToken = ref(''); const serviceAvailable = ref(false);
+const browserDirect = ref(import.meta.env.PROD); const activeStatus = ref<GenerationJob['status']>();
 const provider = ref('OpenAI'); const model = ref(''); const connectionError = ref('');
 const canGenerate = computed(() => serviceAvailable.value && !connectionError.value && (configured.value || !!apiToken.value.trim()));
 const progress = ref(''); const disposed = ref(false);
@@ -63,13 +64,14 @@ async function redraw() {
 }
 async function checkService() {
   checking.value = true;
-  try { const status = await serviceStatus(); serviceAvailable.value = true; configured.value = status.configured; activeId.value = status.activeId; provider.value = status.provider; model.value = status.model; connectionError.value = status.error ?? ''; }
-  catch { serviceAvailable.value = false; configured.value = false; model.value = ''; connectionError.value = ''; }
+  try { const status = await serviceStatus(); serviceAvailable.value = true; configured.value = status.configured; activeId.value = status.activeId; activeStatus.value = status.activeStatus; browserDirect.value = status.transport === 'browser'; provider.value = status.provider; model.value = status.model; connectionError.value = status.error ?? ''; }
+  catch (reason) { serviceAvailable.value = false; configured.value = false; model.value = ''; connectionError.value = reason instanceof Error ? reason.message : '未能準備生成，請重新檢查。'; }
   finally { checking.value = false; }
 }
 async function generate() {
   if (generationBusy.value || builtIn.value && ready.value) return;
   const snapshot = parseRecipe(props.recipe); const key = sourceKey(snapshot); const token = apiToken.value.trim();
+  let submittedId: string | undefined;
   generationBusy.value = true; error.value = ''; progress.value = '準備原畫參考…';
   try {
     actionDescription(snapshot);
@@ -82,6 +84,7 @@ async function generate() {
       if (job.status === 'processing') job = await submitAnimation(snapshot, token);
       else { activeId.value = null; job = await submitAnimation(snapshot, token); }
     } else job = await submitAnimation(snapshot, token);
+    submittedId = job.id;
     snapshot.sheet = { ...snapshot.sheet, generationId: job.id, sourceKey: key };
     if (!disposed.value && sourceKey(props.recipe) === key) emit('update:sheet', snapshot.sheet);
     activeId.value = job.status === 'completed' ? null : job.id;
@@ -92,7 +95,16 @@ async function generate() {
       await redraw(); message.value = '角色動作已生成並保存。請播放檢查姿勢及循環銜接；相同素材與動作會重用這次結果。';
       if (ready.value) toggle();
     }
-  } catch (reason) { if (!disposed.value) error.value = reason instanceof Error ? reason.message : '生成失敗，請再試一次。'; }
+  } catch (reason) {
+    if (!disposed.value) {
+      const failed = submittedId ? await readJob(submittedId).catch(() => undefined) : undefined;
+      if (failed?.status === 'failed' && props.recipe.sheet.generationId === submittedId) {
+        const next = { ...props.recipe.sheet }; delete next.generationId; delete next.sourceKey; emit('update:sheet', next);
+        await nextTick();
+      }
+      error.value = reason instanceof Error ? reason.message : '生成失敗，請再試一次。';
+    }
+  }
   finally { generationBusy.value = false; progress.value = ''; if (!disposed.value) await checkService(); }
 }
 async function resumeOther() {
@@ -101,6 +113,16 @@ async function resumeOther() {
   try { await waitForAnimation(await readJob(activeId.value), job => { progress.value = `正在完成 ${job.sprite} 的動作影格…`; }); message.value = '上一張素材的影格已保存，可返回該素材查看。'; }
   catch (reason) { error.value = (reason as Error).message; }
   finally { generationBusy.value = false; progress.value = ''; await checkService(); }
+}
+async function releasePending() {
+  try {
+    await releaseUncertainAnimation(); error.value = ''; message.value = '待確認工作已解除，尚未重新送出生成。';
+    if (props.recipe.sheet.generationId === activeId.value) {
+      const next = { ...props.recipe.sheet }; delete next.generationId; delete next.sourceKey; emit('update:sheet', next);
+    }
+  }
+  catch (reason) { error.value = (reason as Error).message; }
+  await checkService();
 }
 async function exportSheet(kind: 'zip' | 'png' | 'json') {
   exporting.value = true; error.value = '';
@@ -131,15 +153,16 @@ watch(() => props.recipe, redraw, { deep: true });
       <div class="api-token-field">
         <label for="studio-api-token">OpenAI API token</label>
         <div class="api-token-control"><input id="studio-api-token" v-model="apiToken" type="password" autocomplete="off" autocapitalize="off" :spellcheck="false" maxlength="4096" placeholder="貼上你的 API token" aria-describedby="studio-api-token-note"><button type="button" class="quiet-button" :disabled="!apiToken" @click="clearApiToken">清除 token</button></div>
-        <p id="studio-api-token-note" class="sheet-note">只供目前頁面使用，不會儲存或加入匯出檔案；重新整理即清除。{{ configured ? '留空時使用本機已設定的金鑰。' : '貼上後即可生成角色動作。' }}</p>
+        <p id="studio-api-token-note" class="sheet-note">只供目前頁面使用，不會儲存或加入匯出檔案；重新整理即清除。{{ browserDirect ? '由此瀏覽器直接傳送至 OpenAI，貼上後即可生成。' : configured ? '留空時使用本機已設定的金鑰。' : '貼上後即可生成角色動作。' }}</p>
       </div>
       <div class="generation-bar"><p>{{ builtIn && ready ? '這個小車動作已有 8 張原畫影格，可直接播放及匯出。' : '原圖作為角色與畫風參考，每次生成一個動作。' }}</p><button type="button" class="download-button" :disabled="generationBusy || checking || ready || (!generated && !canGenerate) || (sheet.motion === 'custom' && !sheet.prompt.trim())" @click="generate">{{ generationBusy ? '正在生成…' : ready ? '✓ 動作已處理' : generated ? '查看生成結果' : '✦ 一鍵生成角色動作' }}</button></div>
     </div>
     <p v-if="checking" class="connection-note" role="status">正在檢查生成服務…</p>
-    <div v-else-if="!serviceAvailable" class="connection-note"><strong>尚未連接生成服務</strong><p>請從本機素材工房開啟，再貼上 API token 生成動作；已保存的動作仍可播放和匯出。</p><button class="quiet-button" type="button" @click="checkService">重新檢查連線</button></div>
+    <div v-else-if="!serviceAvailable" class="connection-note"><strong>未能準備生成</strong><p>{{ browserDirect ? '請使用支援本機儲存的新版瀏覽器，檢查下方提示後重試。' : '請確認本機開發伺服器正在運行。' }}已保存的動作仍可播放和匯出。</p><button class="quiet-button" type="button" @click="checkService">重新檢查連線</button></div>
+    <p v-if="browserDirect && serviceAvailable" class="sheet-note">網上生成已就緒。生成時請保持此頁開啟，影格會保存於此瀏覽器，可另行下載備份。</p>
     <p v-if="model" class="sheet-note">生成模型：{{ provider }} · {{ model }}</p>
     <p v-if="connectionError" class="sheet-error" role="alert">{{ connectionError }}</p>
-    <p v-if="activeId && !generationBusy" class="connection-note">有一張素材正在處理。<button type="button" class="quiet-button" @click="resumeOther">查看進度</button></p>
+    <p v-if="activeId && !generationBusy" class="connection-note"><template v-if="browserDirect && activeStatus === 'uncertain'">上次生成中斷，未能確認結果。請先核對 OpenAI 用量，避免重複付費。<button type="button" class="quiet-button" @click="releasePending">已核對用量，解除待確認工作</button></template><template v-else>有一張素材正在處理。<button type="button" class="quiet-button" @click="resumeOther">查看進度</button></template></p>
     <p v-if="progress" class="generation-progress" role="status">{{ progress }}</p>
     <div class="sheet-workbench">
       <div class="sheet-player">

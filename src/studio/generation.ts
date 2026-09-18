@@ -2,9 +2,11 @@ import { ref } from 'vue';
 import type { Recipe } from './recipe';
 import { renderSprite } from './draw';
 import { generatedAtlasLayout } from './animation';
-import { buildReferenceCanvas, normalizePoseFrames, type SpritePipeline } from './spritePipeline';
-export type GenerationJob = { id: string; status: 'submitting' | 'processing' | 'completed' | 'failed' | 'uncertain'; sprite: string; action: string; frames: number; createdAt: string; images?: string[]; atlas?: { image: string; columns: number; rows: number; width: number; height: number }; model?: string; pipeline?: SpritePipeline; error?: string };
-export type ServiceStatus = { configured: boolean; provider: string; model: string; error?: string; activeId: string | null };
+import { buildReferenceCanvas, normalizePoseFrames } from './spritePipeline';
+import { createBrowserGeneration } from './browserGeneration';
+import type { GenerationJob } from './imageProvider';
+export type { GenerationJob } from './imageProvider';
+export type ServiceStatus = { configured: boolean; provider: string; model: string; error?: string; activeId: string | null; activeStatus?: GenerationJob['status']; transport?: 'browser' };
 export const generationBusy = ref(false);
 const frameCache = new Map<string, Promise<HTMLCanvasElement[]>>();
 const imported = new Map<string, GenerationJob>();
@@ -51,13 +53,16 @@ async function api<T>(path: string, body?: unknown, apiToken?: string): Promise<
   if (!response.ok) throw new Error(data.error || '生成服務暫時無法使用。');
   return data as T;
 }
-export const serviceStatus = () => api<ServiceStatus>('status');
-export const readJob = async (id: string): Promise<GenerationJob> => imported.get(id) ?? await savedJob(id).catch(() => undefined) ?? api<GenerationJob>(`jobs/${id}`);
+const browserGeneration = createBrowserGeneration({ read: savedJob, save: job => savedJob(job.id, job) });
+export const serviceStatus = (): Promise<ServiceStatus> => import.meta.env.PROD ? browserGeneration.status() : api<ServiceStatus>('status');
+export const readJob = async (id: string): Promise<GenerationJob> => imported.get(id) ?? (import.meta.env.PROD ? await browserGeneration.poll(id) : await savedJob(id).catch(() => undefined) ?? await api<GenerationJob>(`jobs/${id}`));
+export const releaseUncertainAnimation = () => browserGeneration.releaseUncertain();
 export async function submitAnimation(recipe: Recipe, apiToken?: string) {
   const reference = document.createElement('canvas');
   await renderSprite(reference, { ...recipe, size: 256 });
   const referenceCanvas = buildReferenceCanvas(reference, recipe.sheet.frames);
-  return api<GenerationJob>('jobs', { sprite: recipe.sprite, source: reference.toDataURL('image/png'), referenceCanvas: referenceCanvas.toDataURL('image/png'), motion: recipe.sheet.motion, action: actionDescription(recipe), frames: recipe.sheet.frames, seed: recipe.seed }, apiToken);
+  const input = { sprite: recipe.sprite, source: reference.toDataURL('image/png'), referenceCanvas: referenceCanvas.toDataURL('image/png'), motion: recipe.sheet.motion, action: actionDescription(recipe), frames: recipe.sheet.frames, seed: recipe.seed };
+  return import.meta.env.PROD ? browserGeneration.submit(input, apiToken) : api<GenerationJob>('jobs', input, apiToken);
 }
 export async function waitForAnimation(job: GenerationJob, onProgress: (job: GenerationJob) => void) {
   let current = job; const deadline = Date.now() + 15 * 60_000;

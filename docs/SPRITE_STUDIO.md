@@ -36,9 +36,22 @@
 - 小車 `drive` 動作使用內建 imagegen 參考遊戲小車繪製的 8 張姿勢原畫，包含揮手、眨眼及輪轂角度變化。Canvas 依車身定位對齊各格，保留局部調色、構圖、翻轉及裝飾；角色動作固定 8 格，不複製靜態影格來湊數。
 - 所有動畫均使用獨立姿勢影格，`meta.animationType` 為 `painted-poses`。沒有影格時顯示待生成，播放與匯出停用。舊整圖動畫程式已刪除。
 - OpenAI 生成整張透明圖集後，程式使用整組共同比例整理成每格 256 px，保留手繪筆觸；跳躍、跑步及自訂動作保持全組共同座標，保留離地高度。64／128／256／512 px 是匯出尺寸，512 px 不代表原生解析度。每格直接繪製獨立姿勢，不另加整圖動效。更改原畫配色、姿勢描述等會使既有生成參考失效，須生成相符動作。
-- 生成影格會保存於本機 `.sprite-studio/jobs/`，瀏覽器另用 IndexedDB 快取。下載設計 JSON 或 ZIP 時會內嵌影格，匯入後可離線播放及重新編排。清除瀏覽器資料不會刪除本機工作檔；重要作品仍應下载備份。
+- 網上版生成影格保存在目前瀏覽器的 IndexedDB；本機開發版另外保存於 `.sprite-studio/jobs/`。下載設計 JSON 或 ZIP 時會內嵌影格，匯入後可離線播放及重新編排。網上版清除瀏覽器資料會移除影格；重要作品請下載備份。本機開發版的工作檔則不受影響。
 - 小車動作的處理狀態、SHA-256、框位與驗證結果記於 [manifest](../src/assets/picnic/car-drive/manifest.json)；完整 [提示詞及來源](../src/assets/picnic/car-drive/README.md) 同目錄保存。一次只處理一個素材，已處理的小車不重複生成。
 - 目前沒有四／八方向新視角或骨架編輯器；走路等動作由文字及原畫參考生成。
+
+## 網上版一鍵生成
+
+[正式工房](https://game1.iclover.net/kids-game/#sprite-studio) 是靜態網站。正式建置直接由瀏覽器呼叫 OpenAI Images API，不再要求只有 `npm run dev` 才提供的 `/__sprite-studio/status`。
+
+1. 選素材、動作及影格數；自訂動作須填寫描述。
+2. 貼上自己的 OpenAI API token。顯示「網上生成已就緒」後，按「一鍵生成角色動作」。API 帳戶須具備目前圖像模型的存取權及額度。
+3. 生成時保持頁面開啟。token 只放在送往 `https://api.openai.com/v1/images/edits` 的 Authorization header，不經本網站伺服器、不儲存，重新整理即清除。
+4. 結果保存在此瀏覽器，檢查後下載素材包並標記完成。生成紀錄不包含 token。
+
+同來源頁面用 Web Locks 共用逐張生成限制；相同輸入會重用已有工作。若頁面關閉或連線中斷，紀錄轉為「待確認」，不會自動重送。先核對 OpenAI 用量，確認可以重試後按「已核對用量，解除待確認工作」，再手動生成。解除工作本身不會呼叫 API，也不會取消先前可能仍在 OpenAI 處理的請求。明確的 token 無效或額度不足會顯示原因，可修正後重試。
+
+瀏覽器需要 HTTPS、Web Locks、localStorage 及 IndexedDB；正式建置可用 `npm run preview` 在本機重現。頁面不會將 token 寫入這些儲存空間。範例素材及離線匯入功能保持可用。
 
 ## 啟用本機一鍵生成
 
@@ -49,9 +62,9 @@
 5. 本機立即回傳工作編號，瀏覽器每 5 秒查看本機狀態；OpenAI 的同步 Images API 在本機背景工作中執行，最長等待 10 分鐘。完成後先驗證 PNG 格式及尺寸，再檢查各格透明背景、邊界和影格差異，按整組共同比例整理成 256 px 姿勢。整理狀態隨設計保存，重新匯入不會再次縮放。
 6. 播放並逐格檢查角色身分、筆觸、肢體動作與循環接點，再匯出。提示詞要求保持原風格及獨立姿勢，但模型並非專門的動畫引擎；格子內容與循環品質仍需目視檢查。程式拒絕切格超界、空白、不透明或全部相同的影格。
 
-此接駁隨 Vite 開發伺服器啟動，只接受 loopback 與同來源請求。GitHub Pages 的正式網站沒有生成後端；若要讓網上工房也可新增動作，仍需部署有登入保護的生成服務。現有網站建置不包含金鑰或伺服器程式。執行時不會呼叫 PixelLab。
+本機接駁隨 Vite 開發伺服器啟動，只接受 loopback 與同來源請求。GitHub Pages 正式版使用上述瀏覽器直接生成流程；網站建置不包含金鑰或伺服器程式。執行時不會呼叫 PixelLab。
 
-頁面 token 僅在提交生成時透過 `Authorization` header 送往同來源本機服務，再用於 OpenAI 請求；不會放進 URL、設計資料、localStorage、sessionStorage、IndexedDB、工作檔案或匯出包。服務不會把它保存為下一次請求的金鑰，查詢狀態及讀取已完成影格也不會附帶 token。清除欄位不會取消已送出的生成工作。
+本機開發版的頁面 token 僅在提交生成時透過 `Authorization` header 送往同來源本機服務，再用於 OpenAI 請求；不會放進 URL、設計資料、localStorage、sessionStorage、IndexedDB、工作檔案或匯出包。服務不會把它保存為下一次請求的金鑰，查詢狀態及讀取已完成影格也不會附帶 token。清除欄位不會取消已送出的生成工作。
 
 每次只容許一個工作。工作內容識別包含 pipeline 版本、模型、參考圖及畫布、動作、描述、影格數及組合種子，相同輸入直接重用結果。OpenAI Images API 不接收 seed 參數；組合種子只用於原畫合成與本機重複工作識別，不保證重新送往模型後得到相同畫面。
 
@@ -67,7 +80,9 @@ OpenAI Images API 沒有可在重啟後續查的供應商工作編號。若伺�
 - `src/studio/recipe.ts`：穩定種子、鎖定邏輯、參數驗證、版本 4 JSON 與版本 1／2／3 遷移。
 - `src/studio/animation.ts`、`sheet.ts`、`SpriteSheet.vue`：角色動作選擇、固定框位圖集、動畫預覽及匯出。
 - `server/sprite-generation.ts`：本機 OpenAI Images API 接駁、持久工作紀錄、逐張處理、輪詢和重複工作重用。
-- `src/studio/generation.ts`：動作提示詞、生成狀態、影格驗證、IndexedDB 保存與攜帶影格的設計匯入。
+- `src/studio/generation.ts`：依正式／開發建置選擇接駁方式、動作提示詞、影格驗證及 IndexedDB 保存。
+- `src/studio/browserGeneration.ts`：正式站直接呼叫 OpenAI、跨頁面逐張限制及中斷後的待確認紀錄。
+- `src/studio/imageProvider.ts`：網上版與本機版共用的請求格式、模型、圖集驗證及錯誤訊息。
 - `src/studio/spritePipeline.ts`：原畫參考畫布、整組共同比例與定位；採用官方流程的方式見 [Sprite Pipeline 接駁](SPRITE_PIPELINE.md)。
 - `src/studio/actionFrames.ts`：載入、對齊及調色已完成的小車動作原畫；限制快取數量。
 - `src/studio/download.ts`：PNG 編碼、檔案下載與無額外依賴的 ZIP 打包。
@@ -81,6 +96,8 @@ OpenAI Images API 沒有可在重啟後續查的供應商工作編號。若伺�
 `npm test` 包含素材覆蓋、種子、鎖定、JSON 往返、不合法輸入、舊版遷移、完成紀錄、圖集座標／時間與 ZIP 完整性驗證。`npm run build` 執行型別檢查與正式建置。
 
 啟動 `npm run dev`，開啟 `/kids-game/tests/studio-browser.html` 可在真實 Canvas 上檢查 22 個模型、660 次繪製、四種輸出尺寸、透明邊界、三種構圖、翻轉、材質調色及 PNG alpha；預設輸出另外與原畫等比例繪製做逐像素比對，並檢查非同步繪製不會讓舊選擇蓋過新選擇。小車角色動作另驗證 32 組尺寸／排版／翻轉組合，以及手臂輪廓變化、閉眼變化、局部調色和 ZIP 產生。另用明確標示的原畫測試影格驗證生成结果解碼、拒絕全相同影格／不透明背景，以及可攜設計包含完整影格。這些固定測試素材不代表已完成線上 AI 生成品質驗證。頁面同時顯示完整素材檢視表。這個測試頁不會打包進正式網站。
+
+正式建置的瀏覽器流程亦驗證輸入 token 後按鈕啟用、中斷後解除待確認工作及重新整理清空 token。HTTP 測試確認 OpenAI 接受跨來源預檢；無效測試 token 回傳 401，但該錯誤回應缺少 CORS 標頭，內嵌瀏覽器因此顯示未能確認結果。401／額度不足的可讀回應及成功生成流程另以模擬回應驗證；沒有使用用戶 token 做付費生成。
 
 人工瀏覽器流程另外驗證：種子錯誤提示、鎖定部件、標記完成、重新載入、跳過已完成項目、遊戲套用與恢復，以及 390 px 手機版無水平溢出。
 
