@@ -1,0 +1,74 @@
+{
+  "pipeline": "openai-sprite-pipeline-v1",
+  "source": "Codex built-in imagegen; not a live OpenAI API test",
+  "uniquePoses": 8,
+  "bounds": [
+    {
+      "x": 40,
+      "y": 60,
+      "width": 175,
+      "height": 175
+    },
+    {
+      "x": 27,
+      "y": 59,
+      "width": 202,
+      "height": 176
+    },
+    {
+      "x": 21,
+      "y": 59,
+      "width": 214,
+      "height": 176
+    },
+    {
+      "x": 31,
+      "y": 59,
+      "width": 194,
+      "height": 176
+    },
+    {
+      "x": 39,
+      "y": 58,
+      "width": 178,
+      "height": 177
+    },
+    {
+      "x": 27,
+      "y": 58,
+      "width": 202,
+      "height": 177
+    },
+    {
+      "x": 32,
+      "y": 58,
+      "width": 192,
+      "height": 177
+    },
+    {
+      "x": 39,
+      "y": 57,
+      "width": 178,
+      "height": 178
+    }
+  ],
+  "firstAttempt": "Rejected: two cells crossed frame boundaries",
+  "revision": "Layout repaired using imagegen; resized to API grid for sample processing",
+  "processed": true,
+  "processedAt": "2026-09-18T17:03:22.814502+00:00",
+  "asset": "picnic/level-1/bear/wave",
+  "generationId": "fe564ee21c54100af9b5e396b08e62440bdfd495681fd68d3f1b2cd4ae3fcea3",
+  "reviewed": {
+    "browserPlayback": true,
+    "pawArticulation": true,
+    "blink": true,
+    "noClipping": true,
+    "markedCompleteInWorkshop": true
+  },
+  "sha256": {
+    "reference.png": "a7d0d001c33590ead25e80d9791e68163b6a0744aa2a8dc151f36963a9660325",
+    "atlas.png": "d3ce76123bdfbabc461112a765420077fa17722908838d658a62448b609e9a76",
+    "sprite.png": "1dc0cfb0e017f0ef6ab6f244ae1c4cad4b80625e648ef69a256cd8c8bb00c6d2",
+    "design.json": "a364a41766b645fdfae20f829fcabf5124ed52eb178cda479c6ba5159d934d95"
+  }
+}

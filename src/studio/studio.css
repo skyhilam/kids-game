@@ -8,3 +8,5 @@
 @media(prefers-reduced-motion:reduce){.sprite-studio *{transition:none!important}}
 
 .style-reference{display:flex;gap:14px;align-items:center;margin-top:18px;padding:12px;background:#f6f3e8;border:1px solid #e8e1cc;border-radius:11px}.reference-thumb{width:66px;height:66px;flex:none}.style-reference strong{font-size:11px;color:#65794f}.style-reference p{font-size:10px;color:#8a927b;margin-top:5px;line-height:1.7}.sprite-studio .palette-list button:first-child{grid-column:1/-1;flex-direction:row;gap:10px;padding:10px;background:#f4f0df}.painted-note{font-size:9px;color:#8a927b}
+
+.action-notice{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 17px;margin-top:18px;border:1px solid #c4d4b5;background:#edf3e4;border-radius:11px}.action-notice strong{font-size:13px;color:#486640}.action-notice p,.action-pending{font-size:11px;color:#71816a;line-height:1.8}.action-pending{margin-top:12px!important}@media(max-width:620px){.action-notice{align-items:stretch;flex-direction:column;gap:10px}.action-notice .download-button{width:100%}}

@@ -45,7 +45,7 @@ iPad／iPhone：用 **Safari** 打開上面網址即可。按分享鈕 →「加
 
 ## 網站部署
 已用 GitHub Pages 公開於 https://game1.iclover.net/kids-game/ （`skyhilam.github.io/kids-game` 會轉去呢度）。
-執行 `npm run build` 後，發佈完整 `dist/` 目錄（包含圖片與程式素材）。網站執行時不需要後端或資料庫。
+執行 `npm run build` 後，發佈完整 `dist/` 目錄（包含圖片與程式素材）。遊戲與原畫合成可純靜態執行；素材工房新增 AI 角色動作須啟用下述本機生成服務。
 本機檢查正式版本：
 
     npm run build
@@ -65,9 +65,9 @@ iPad／iPhone：用 **Safari** 打開上面網址即可。按分享鈕 →「加
 
 ### Canvas 素材工房
 
-首頁下方的「素材工房」可按遊戲／關卡製作目前使用的 22 種單個素材。沿用遊戲原畫的繪本風格，支援構圖、局部調色、原畫裝飾、可重現種子與鎖定。可製作 4／8／12 格循環動畫，逐格預覽並匯出 sprite sheet PNG、影格 JSON 及整包 ZIP；動畫設定會隨完成紀錄保存。單張造型仍可下載或套用到遊戲，並隨時恢復原畫。
+首頁下方的「素材工房」可按遊戲／關卡製作目前使用的 22 種單個素材。沿用遊戲原畫的繪本風格，支援構圖、局部調色、原畫裝飾、可重現種子與鎖定。小車提供 8 張揮手、眨眼及車輪轉動的獨立動作原畫；工房改為選動作後，一鍵透過 OpenAI 圖像 API（預設 GPT Image 2.5 Sunburst）生成 4／8／12 張新姿勢，已移除整圖動效。在本機工房貼上 OpenAI API token 即可新增動作；token 只供目前頁面使用，不會儲存，重新整理即清除。純靜態網站仍可使用已有／匯入的動作。可逐格預覽並匯出 sprite sheet PNG、影格 JSON 及整包 ZIP，動畫設定會隨完成紀錄保存。單張造型仍可下載或套用到遊戲，並隨時恢復原畫。
 
-執行 `npm run dev` 後開啟 `/kids-game/#sprite-studio`。操作、範圍與維護方式見 [Canvas 素材工房](docs/SPRITE_STUDIO.md)。
+執行 `npm run dev` 後開啟 `/kids-game/#sprite-studio`。已接入 OpenAI 官方 [sprite-pipeline 流程](docs/SPRITE_PIPELINE.md)：原畫放入透明參考畫布，一次生成整組姿勢，再以共同比例整理定位。操作、範圍與維護方式見 [Canvas 素材工房](docs/SPRITE_STUDIO.md)。
 
 Vue 3 + TypeScript + Vite。各款遊戲共用透明插畫素材庫，由 `src/art/sprites.ts` 登記，透過 `GameSprite.vue` 使用。新增遊戲可直接重用角色、場景和道具，詳見 [共用素材使用說明](src/art/README.md)；參考照片的逐張處理狀態見 [處理紀錄](src/art/reference-progress.json)。箭頭、音量等介面符號保留為可變色的 SVG。
 支援觸控、滑鼠、方向鍵，響應式手機／平板版面及減少動態效果設定。

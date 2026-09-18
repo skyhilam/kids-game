@@ -32,7 +32,7 @@ describe('Canvas sprite studio', () => {
   });
   it('rejects malformed or unsupported imported designs before they reach Canvas', () => {
     const recipe = initialRecipe('car');
-    for (const patch of [{ version: 4 }, { sprite: '__proto__' }, { palette: 'toString' }, { size: 8192 }, { scale: NaN }, { scale: 101 }, { variant: 1.5 }, { seed: -1 }, { seed: Infinity }, { primary: 'url(https://example.com)' }, { mirror: 'true' }]) {
+    for (const patch of [{ version: 99 }, { sprite: '__proto__' }, { palette: 'toString' }, { size: 8192 }, { scale: NaN }, { scale: 101 }, { variant: 1.5 }, { seed: -1 }, { seed: Infinity }, { primary: 'url(https://example.com)' }, { mirror: 'true' }]) {
       expect(() => parseRecipe({ ...recipe, ...patch })).toThrow();
     }
     expect(() => parseDesign({ format: 'picnic-sprite', version: 1, context: { game: 'tooth', level: 1 }, recipe })).toThrow();
@@ -64,7 +64,7 @@ describe('Canvas sprite studio', () => {
   it('defaults to the unmodified original painted artwork for every model', () => {
     for (const name of modelNames) {
       const recipe = initialRecipe(name);
-      expect(recipe.version).toBe(3); expect(recipe.palette).toBe('original');
+      expect(recipe.version).toBe(4); expect(recipe.palette).toBe('original');
       expect(recipe.primary).toBe(materials[name].primary.color);
       expect(recipe.secondary).toBe(materials[name].secondary.color);
       expect(recipe.variant).toBe(0); expect(recipe.detail).toBe(0);

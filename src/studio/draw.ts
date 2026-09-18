@@ -58,11 +58,11 @@ function drawFitted(ctx: CanvasRenderingContext2D, image: HTMLCanvasElement, cx:
   ctx.drawImage(image, cx - width / 2, cy - height / 2, width, height);
 }
 /** Compose the game's painted parts. Latest requested render wins after image loading. */
-export async function renderSprite(canvas: HTMLCanvasElement, recipe: Recipe): Promise<void> {
+export async function renderSprite(canvas: HTMLCanvasElement, recipe: Recipe, sourceFrame?: HTMLCanvasElement): Promise<void> {
   const job = (renderJobs.get(canvas) ?? 0) + 1; renderJobs.set(canvas, job);
   const snapshot = { ...recipe };
   const [source, ornament] = await Promise.all([
-    materialSprite(snapshot),
+    sourceFrame ?? materialSprite(snapshot),
     snapshot.detail ? originalSprite(snapshot.detail === 1 ? 'flower' : 'sun') : Promise.resolve(null),
   ]);
   if (renderJobs.get(canvas) !== job) return;

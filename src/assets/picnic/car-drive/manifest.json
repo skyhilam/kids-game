@@ -1,0 +1,142 @@
+{
+  "id": "car-drive",
+  "sprite": "car",
+  "status": "completed",
+  "frameCount": 8,
+  "source": "../sprites.png",
+  "sourceSha256": "db427e8c49c647fc81f04ca76b585086e841f09ed2d43587d992550dfc1e141f",
+  "image": "sprites.png",
+  "imageSha256": "16702ca15179866bbcc6155aaa92ad1bc5753570ccd19a4caa92a44b9b65c8c3",
+  "generator": "built-in imagegen",
+  "size": [
+    1774,
+    887
+  ],
+  "frames": [
+    {
+      "rect": [
+        0,
+        0,
+        444,
+        444
+      ],
+      "bodyBounds": [
+        41,
+        222,
+        431,
+        405
+      ]
+    },
+    {
+      "rect": [
+        444,
+        0,
+        443,
+        444
+      ],
+      "bodyBounds": [
+        41,
+        222,
+        429,
+        405
+      ]
+    },
+    {
+      "rect": [
+        887,
+        0,
+        443,
+        444
+      ],
+      "bodyBounds": [
+        41,
+        222,
+        429,
+        405
+      ]
+    },
+    {
+      "rect": [
+        1330,
+        0,
+        444,
+        444
+      ],
+      "bodyBounds": [
+        41,
+        222,
+        427,
+        404
+      ]
+    },
+    {
+      "rect": [
+        0,
+        444,
+        444,
+        443
+      ],
+      "bodyBounds": [
+        42,
+        222,
+        428,
+        377
+      ]
+    },
+    {
+      "rect": [
+        444,
+        444,
+        443,
+        443
+      ],
+      "bodyBounds": [
+        41,
+        222,
+        427,
+        375
+      ]
+    },
+    {
+      "rect": [
+        887,
+        444,
+        443,
+        443
+      ],
+      "bodyBounds": [
+        41,
+        222,
+        427,
+        377
+      ]
+    },
+    {
+      "rect": [
+        1330,
+        444,
+        444,
+        443
+      ],
+      "bodyBounds": [
+        41,
+        222,
+        423,
+        374
+      ]
+    }
+  ],
+  "notes": "獨立揮手、眨眼與車輪影格；Canvas 以車身邊界對齊，各格不以手臂外框重新置中。",
+  "completedAt": "2026-09-18T14:43:01.864551+00:00",
+  "validation": {
+    "unitTests": 170,
+    "actionSheets": 32,
+    "independentPoses": 8,
+    "handSilhouetteChangedPixels": 8513,
+    "openEyeDarkPixels": 1456,
+    "closedEyeDarkPixels": 962,
+    "transparentEdges": "passed",
+    "palette": "passed",
+    "build": "passed"
+  }
+}

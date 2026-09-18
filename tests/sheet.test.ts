@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSheet, frameTransform, motions, parseSheet, sheetLayout } from '../src/studio/animation';
+import { defaultSheet, parseSheet, sheetLayout } from '../src/studio/animation';
 import { crc32, zipFiles } from '../src/studio/download';
 import { exportDesign, generateRecipe, initialRecipe, parseDesign, parseRecipe, recipeKey } from '../src/studio/recipe';
 import { sheetMetadata } from '../src/studio/sheet';
@@ -8,8 +8,8 @@ describe('2D sprite sheet production', () => {
   it('migrates painted designs without changing their appearance and round-trips animation edits', () => {
     const painted = { ...initialRecipe('car'), primary: '#649FAE', variant: 2, version: 2, sheet: undefined };
     const migrated = parseRecipe(painted);
-    expect(migrated).toEqual({ ...painted, version: 3, sheet: defaultSheet() });
-    const edited = { ...migrated, sheet: { ...defaultSheet(), fps: 17, frames: 12 as const, columns: 8 as const, motion: 'sway' as const } };
+    expect(migrated).toEqual({ ...painted, version: 4, sheet: defaultSheet('car') });
+    const edited = { ...migrated, sheet: { ...defaultSheet(), fps: 17, frames: 12 as const, columns: 8 as const, motion: 'walk' as const } };
     const context = { game: 'picnic' as const, level: 3 };
     expect(parseDesign(JSON.parse(exportDesign(context, edited)))).toEqual({ context, recipe: edited });
     expect(recipeKey(edited)).not.toBe(recipeKey(migrated));
@@ -31,7 +31,7 @@ describe('2D sprite sheet production', () => {
       expect(layout.width * layout.height).toBeGreaterThanOrEqual(count * size * size);
       expect(metadata.meta.image).toBe('sprite.png');
       expect(metadata.meta.size).toEqual({ w: layout.width, h: layout.height });
-      expect(metadata.meta.frameTags[0]).toEqual({ name: 'bob', from: 0, to: count - 1, direction: 'forward' });
+      expect(metadata.meta.frameTags[0]).toEqual({ name: 'wave', from: 0, to: count - 1, direction: 'forward' });
       Object.values(metadata.frames).forEach((entry, i) => {
         expect(entry.frame).toEqual({ x: i % layout.columns * size, y: Math.floor(i / layout.columns) * size, w: size, h: size });
         expect(entry.frame.x + size).toBeLessThanOrEqual(layout.width);
@@ -42,19 +42,17 @@ describe('2D sprite sheet production', () => {
       expect(Object.values(metadata.frames).reduce((total, frame) => total + frame.duration, 0)).toBe(count / 16 * 1000);
     }
   });
-  it('loops continuously with bounded movement and leaves the static pose untouched', () => {
-    for (const motion of Object.keys(motions) as (keyof typeof motions)[]) {
-      const settings = { ...defaultSheet(), motion };
-      expect(frameTransform(settings, settings.frames)).toEqual(frameTransform(settings, 0));
-      for (let i = 0; i < settings.frames; i++) {
-        const transform = frameTransform(settings, i);
-        expect(Math.abs(transform.angle)).toBeLessThanOrEqual(.075);
-        expect(Math.abs(transform.y)).toBeLessThanOrEqual(.04);
-        expect(transform.xScale).toBeLessThanOrEqual(1);
-        expect(transform.yScale).toBeLessThanOrEqual(1);
-      }
+  it('removes all legacy whole-image modes without losing the static artwork', async () => {
+    const car = initialRecipe('car');
+    for (const motion of ['sway', 'bob', 'breathe', 'still']) {
+      expect(() => parseSheet({ ...defaultSheet(), motion })).toThrow();
+      const migrated = parseRecipe({ ...car, version: 3, sheet: { motion, frames: 12, fps: 17, columns: 8 } });
+      expect(migrated.sheet).toEqual({ ...defaultSheet('car'), fps: 17, columns: 8 });
+      expect(migrated.primary).toBe(car.primary);
     }
-    expect(frameTransform({ ...defaultSheet(), motion: 'still' }, 3)).toEqual({ y: 0, angle: 0, xScale: 1, yScale: 1 });
+    const { renderSheet } = await import('../src/studio/sheet');
+    await expect(renderSheet(initialRecipe('bear'))).rejects.toThrow('請先生成角色動作');
+    expect(sheetMetadata(car, 'car.png').meta.animationType).toBe('painted-poses');
   });
   it('writes valid ZIP offsets, UTF-8 names and exact binary payloads with standard CRC32', async () => {
     const encoder = new TextEncoder(); const decoder = new TextDecoder();

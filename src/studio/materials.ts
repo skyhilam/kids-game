@@ -47,9 +47,9 @@ const colorHsv = (hex: string) => rgbToHsv(parseInt(hex.slice(1, 3), 16), parseI
 const hueDistance = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180);
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
-export function recolorPixels(data: Uint8ClampedArray, width: number, height: number, name: ModelName, primary: string, secondary: string): void {
+export function recolorPixels(data: Uint8ClampedArray, width: number, height: number, name: ModelName, primary: string, secondary: string, materialOverride?: Materials): void {
   const masks = ([['primary', primary], ['secondary', secondary]] as const).flatMap(([key, color]) => {
-    const source = materials[name][key];
+    const source = (materialOverride ?? materials[name])[key];
     return color.toUpperCase() === source.color.toUpperCase() ? [] : [{ source, target: colorHsv(color), original: colorHsv(source.color) }];
   });
   if (!masks.length) return;

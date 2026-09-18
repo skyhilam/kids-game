@@ -5,3 +5,8 @@ browser-out
 *.local
 .vscode
 .idea
+
+.sprite-studio/
+.env
+.env.*
+!.env.example

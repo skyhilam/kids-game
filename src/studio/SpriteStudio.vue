@@ -5,6 +5,7 @@ import { randomSeed } from '../game/rng';
 import { contextKey, kits, levelInfo, models, type GameKind, type ModelName, type StudioContext } from './catalog';
 import CanvasSprite from './CanvasSprite.vue';
 import SpriteSheet from './SpriteSheet.vue';
+import { hasGeneratedAction, importAnimation, readJob } from './generation';
 import { renderSprite } from './draw';
 import { download, pngBlob } from './download';
 import { exportDesign, fileStem, generateRecipe, initialRecipe, paletteColors, palettes, parseDesign, recipeKey, type Lockable, type PaletteName, type Recipe } from './recipe';
@@ -98,16 +99,23 @@ async function downloadPng() {
   } catch { error.value = 'PNG 下載失敗，請再試一次。'; }
   finally { downloading.value = false; }
 }
-function downloadJson() {
-  download(new Blob([exportDesign(context.value, recipe.value)], { type: 'application/json' }), `${fileStem(context.value, recipe.value)}.json`);
-  message.value = '設計 JSON 已送往下載，可重新載入繼續調整。';
+async function downloadJson() {
+  const snapshot = { ...recipe.value }; const destination = { ...context.value };
+  try {
+    const design = JSON.parse(exportDesign(destination, snapshot));
+    if (hasGeneratedAction(snapshot)) design.animation = await readJob(snapshot.sheet.generationId!);
+    download(new Blob([JSON.stringify(design, null, 2)], { type: 'application/json' }), `${fileStem(destination, snapshot)}.json`);
+    message.value = '設計 JSON 已送往下載，可重新載入繼續調整。';
+  } catch { error.value = '無法載入角色影格，請檢查生成服務後再匯出設計。'; }
 }
 async function importJson(event: Event) {
   const input = event.target as HTMLInputElement; const file = input.files?.[0];
   if (!file) return;
   try {
-    if (file.size > 100_000) throw new Error('設計檔過大，請使用素材工房匯出的單個素材 JSON。');
-    const design = parseDesign(JSON.parse(await file.text()));
+    if (file.size > 26_000_000) throw new Error('設計檔過大，請使用素材工房匯出的單個素材 JSON。');
+    const contents = JSON.parse(await file.text());
+    const design = parseDesign(contents);
+    if (contents.animation) await importAnimation(contents.animation, design.recipe);
     stash(); game.value = design.context.game; level.value = design.context.level; selected.value = design.recipe.sprite;
     recipe.value = design.recipe; seedInput.value = design.recipe.seed;
     message.value = '已載入設計，可繼續修改。'; error.value = '';
@@ -193,7 +201,7 @@ loadSelected();
     </section>
 
     <section class="try-game studio-panel"><div><h2>放進遊戲，看看合不合適</h2><p>套用後，此瀏覽器中所有「{{ models[selected].label }}」會使用目前單張造型，也可隨時恢復。動畫請下載 Sprite 素材包。</p></div><div><button class="soft-button" type="button" :disabled="!library.active[selected]" @click="restore">恢復原有插畫</button><button class="complete-button" type="button" :disabled="isApplied || applying" @click="apply">{{ applying ? '合成中…' : isApplied ? '✓ 正在使用' : '套用這個素材' }}</button></div></section>
-    <footer class="studio-footer"><span>✳ 小小素材工房 · 所有圖片在瀏覽器內繪製</span><span>流程參考 <a href="https://pixel-gen.syngamelab.com/" target="_blank" rel="noopener noreferrer">Doll Atelier ↗</a> · <a href="https://www.pixellab.ai/" target="_blank" rel="noopener noreferrer">PixelLab ↗</a></span></footer>
+    <footer class="studio-footer"><span>✳ 小小素材工房 · 原畫合成 · 角色動作生成</span><span>流程參考 <a href="https://pixel-gen.syngamelab.com/" target="_blank" rel="noopener noreferrer">Doll Atelier ↗</a> · <a href="https://developers.openai.com/api/docs/guides/image-generation" target="_blank" rel="noopener noreferrer">OpenAI 圖像 API ↗</a></span></footer>
   </main>
 </template>
 
