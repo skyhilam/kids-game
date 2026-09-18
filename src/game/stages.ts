@@ -40,6 +40,11 @@ export function stickerLoadBand(index = 0): LoadBand {
   return mazeLoadBand(index);
 }
 
+/** Same picnic/brush/sticker bands: 0 easy, 1–7 basic, 8+ puzzle. */
+export function listenLoadBand(index = 0): LoadBand {
+  return mazeLoadBand(index);
+}
+
 export const STAGE_PICK_INTRO =
   '地圖分簡單、基礎、益智三個階段。階段只說明這回路徑同思考負荷，方便按孩子當下狀態點揀，不是年齡分級，也不是能力評分。';
 
@@ -101,9 +106,27 @@ export const parentCopy = {
       show: '家長示範讀一次長詞（例如 toothbrush），唔代拖完全部；卡住先提示睇托盤剩低邊張。',
     },
   },
+  listen: {
+    easy: {
+      goal: '聽完粵語詞，喺 3 張圖入面點啱嗰張。',
+      ask: '「你聽到咩？邊張圖係佢？」',
+      show: '家長播一次後，指住兩個候選圖（唔代點），再交返孩子自己揀。',
+    },
+    basic: {
+      goal: '聽完詞，喺 4 張圖入面揀啱；可能有兩張好似（例如小車同貨車）。',
+      ask: '「邊兩張好似？邊張先啱剛才聽到嗰個？」',
+      show: '出現相似圖時，家長只指住相似嗰兩張，唔代點；等孩子講完再自己揀。',
+    },
+    puzzle: {
+      goal: '聽完詞，喺 6 張圖入面揀啱；可能有較長詞（例如牙刷），要先聽清再揀。',
+      ask: '「唔好急，你記住個詞未？要唔要再聽一次？」',
+      show: '家長示範撳「再聽一次」，之後交返孩子；卡住先提示睇晒所有圖再揀。',
+    },
+  },
 } as const satisfies {
   picnic: Record<LoadBand, ParentGuide>;
   tooth: Record<LoadBand, ParentGuide>;
   delivery: ParentGuide & { load: string };
   sticker: Record<LoadBand, ParentGuide>;
+  listen: Record<LoadBand, ParentGuide>;
 };

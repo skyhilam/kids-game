@@ -3,11 +3,12 @@ import { ref } from 'vue';
 import DeliveryPlay from './components/DeliveryPlay.vue';
 import Hub from './components/Hub.vue';
 import IconDefs from './components/IconDefs.vue';
+import ListenPlay from './components/ListenPlay.vue';
 import PicnicPlay from './components/PicnicPlay.vue';
 import StickerPlay from './components/StickerPlay.vue';
 import ToothPlay from './components/ToothPlay.vue';
 
-const activity = ref<'hub' | 'picnic' | 'tooth' | 'delivery' | 'sticker'>('hub');
+const activity = ref<'hub' | 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen'>('hub');
 </script>
 
 <template>
@@ -17,4 +18,5 @@ const activity = ref<'hub' | 'picnic' | 'tooth' | 'delivery' | 'sticker'>('hub')
   <ToothPlay v-else-if="activity === 'tooth'" @home="activity = 'hub'"/>
   <DeliveryPlay v-else-if="activity === 'delivery'" @home="activity = 'hub'"/>
   <StickerPlay v-else-if="activity === 'sticker'" @home="activity = 'hub'"/>
+  <ListenPlay v-else-if="activity === 'listen'" @home="activity = 'hub'"/>
 </template>
