@@ -62,7 +62,14 @@ iPad／iPhone：用 **Safari** 打開上面網址即可。按分享鈕 →「加
 裝置語音能否離線運作，視乎裝置有冇下載對應語音。
 
 ## 技術
-Vue 3 + TypeScript + Vite。三款遊戲共用 22 款透明插畫素材，由 `src/art/sprites.ts` 登記，透過 `GameSprite.vue` 使用。新增遊戲可直接重用角色、場景和道具，詳見 [共用素材使用說明](src/art/README.md)。箭頭、音量等介面符號保留為可變色的 SVG。
+
+### Canvas 素材工房
+
+首頁下方的「素材工房」可按遊戲／關卡製作目前使用的 22 種單個素材。沿用遊戲原畫的繪本風格，支援構圖、局部調色、原畫裝飾、可重現種子與鎖定。可製作 4／8／12 格循環動畫，逐格預覽並匯出 sprite sheet PNG、影格 JSON 及整包 ZIP；動畫設定會隨完成紀錄保存。單張造型仍可下載或套用到遊戲，並隨時恢復原畫。
+
+執行 `npm run dev` 後開啟 `/kids-game/#sprite-studio`。操作、範圍與維護方式見 [Canvas 素材工房](docs/SPRITE_STUDIO.md)。
+
+Vue 3 + TypeScript + Vite。各款遊戲共用透明插畫素材庫，由 `src/art/sprites.ts` 登記，透過 `GameSprite.vue` 使用。新增遊戲可直接重用角色、場景和道具，詳見 [共用素材使用說明](src/art/README.md)；參考照片的逐張處理狀態見 [處理紀錄](src/art/reference-progress.json)。箭頭、音量等介面符號保留為可變色的 SVG。
 支援觸控、滑鼠、方向鍵，響應式手機／平板版面及減少動態效果設定。
 野餐與刷牙共用無向迷宮規則（`src/game/`）；關卡與文案分屬 `src/picnic/` 與 `src/tooth/`。送貨為獨立路線任務。可用 `npm test` 驗證。
 公開 repo 嘅 `main` 已禁止 force-push／刪除分支，Wiki 關閉。

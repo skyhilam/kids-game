@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>共用遊戲素材預覽</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0 auto; max-width: 1240px; padding: 32px 20px; color: #493b32; background: #faf7ef; font-family: system-ui, sans-serif; }
+      h1 { margin-bottom: 8px; font-size: 28px; }
+      p { color: #786d60; line-height: 1.6; }
+      .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
+      figure { margin: 0; padding: 16px; border-radius: 18px; background: #e4eddf; }
+      figure:nth-child(3n+2) { background: #f3e2d2; }
+      figure:nth-child(3n) { background: #dce9ef; }
+      .large { width: 100%; height: 128px; display: block; }
+      .small { width: 40px; height: 40px; display: block; margin: 12px auto 8px; }
+      figcaption { text-align: center; font-size: 13px; overflow-wrap: anywhere; }
+      label { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
+      select { padding: 10px 14px; border: 1px solid #b6bead; border-radius: 10px; color: inherit; background: white; font: inherit; max-width: 100%; }
+      select:focus-visible { outline: 3px solid #366f94; outline-offset: 3px; }
+    </style>
+  </head>
+  <body>
+    <h1>共用遊戲素材</h1>
+    <p>每款顯示一般尺寸及 40 px 小圖，可在不同底色上檢查透明邊緣與裁切。</p>
+    <main id="gallery"></main>
+    <script type="module">
+      import { createApp, h, ref } from 'vue';
+      import GameSprite from './src/components/GameSprite.vue';
+      import { sprites } from './src/art/sprites.ts';
+      import progress from './src/art/reference-progress.json';
+      const themes = { picnic: '野餐', tooth: '刷牙', delivery: '送貨', ...Object.fromEntries(progress.entries.filter(entry => entry.atlas).map(entry => [entry.atlas, entry.theme])) };
+      const requestedAtlas = new URLSearchParams(location.search).get('atlas');
+      const atlas = ref(requestedAtlas && Object.hasOwn(themes, requestedAtlas) ? requestedAtlas : '');
+      createApp({ render: () => {
+        const names = Object.keys(sprites).filter(name => !atlas.value || sprites[name].atlas === atlas.value);
+        return h('div', [
+          h('label', ['主題', h('select', { value: atlas.value, onChange: event => {
+            atlas.value = event.target.value;
+            const url = new URL(location.href);
+            if (atlas.value) url.searchParams.set('atlas', atlas.value); else url.searchParams.delete('atlas');
+            history.replaceState(null, '', url);
+          } }, [h('option', { value: '' }, `全部（${Object.keys(sprites).length} 款）`), ...Object.entries(themes).map(([value, label]) => h('option', { value }, label))])]),
+          h('p', `顯示 ${names.length} 款素材`),
+          h('div', { class: 'gallery' }, names.map(name => h('figure', [
+            h(GameSprite, { name, label: name, class: 'large' }), h(GameSprite, { name, class: 'small' }), h('figcaption', name),
+          ]))),
+        ]);
+      } }).mount('#gallery');
+    </script>
+  </body>
+</html>

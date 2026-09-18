@@ -81,5 +81,12 @@ const emit = defineEmits<{
         <small class="hub-modes">{{ STAGE_OVERVIEW }} · 聽詞揀圖</small>
       </button>
     </div>
+    <p class="hub-studio-link"><a href="#sprite-studio">素材工房 <span>用 Canvas 製作自己的遊戲素材 →</span></a></p>
   </main>
 </template>
+
+<style scoped>
+.hub-studio-link { margin: 25px 0 0; text-align: center; }
+.hub-studio-link a { color: #718567; font-size: 12px; text-underline-offset: 5px; }
+.hub-studio-link span { font-size: 10px; margin-left: 8px; }
+</style>
