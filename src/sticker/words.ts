@@ -30,6 +30,42 @@ export type StickerDeal = {
   tray: WordId[];
 };
 
+/** Short everyday words for the first sticker level. */
+export const EASY_POOL: readonly WordId[] = [
+  'sun',
+  'car',
+  'home',
+  'tree',
+  'flower',
+  'bear',
+  'kid',
+  'park',
+];
+
+/** Easy plus theme words that start appearing from basic. */
+export const BASIC_POOL: readonly WordId[] = [
+  ...EASY_POOL,
+  'burger',
+  'shop',
+  'truck',
+  'picnic',
+];
+
+/** Full word list: basic plus longer / brushing-theme words. */
+export const PUZZLE_POOL: readonly WordId[] = [
+  ...BASIC_POOL,
+  'parcel',
+  'tooth',
+  'toothbrush',
+  'bug-coral',
+];
+
+export const STICKER_POOL: Record<LoadBand, readonly WordId[]> = {
+  easy: EASY_POOL,
+  basic: BASIC_POOL,
+  puzzle: PUZZLE_POOL,
+};
+
 export const STICKER_LOAD_COUNT: Record<LoadBand, number> = {
   easy: 4,
   basic: 5,
@@ -95,16 +131,22 @@ export function rollRecent(history: readonly (readonly WordId[])[], deal: readon
   return [...history.map((item) => [...item]), [...deal]].slice(-STICKER_RECENT_DEALS);
 }
 
-function pickWords(rand: () => number, count: number, recent: ReadonlySet<WordId>): WordId[] {
-  const fresh = WORD_IDS.filter((id) => !recent.has(id));
-  const reused = WORD_IDS.filter((id) => recent.has(id));
+function pickWords(
+  rand: () => number,
+  count: number,
+  recent: ReadonlySet<WordId>,
+  pool: readonly WordId[],
+): WordId[] {
+  const fresh = pool.filter((id) => !recent.has(id));
+  const reused = pool.filter((id) => recent.has(id));
   if (fresh.length >= count) return shuffle(rand, fresh).slice(0, count);
   return [...fresh, ...shuffle(rand, reused).slice(0, count - fresh.length)];
 }
 
 export function dealBoard(seed: number, level = 0, recent: readonly WordId[] = []): StickerDeal {
   const rand = mulberry32(seed);
-  const words = pickWords(rand, stickerWordCount(level), new Set(recent));
+  const band = stickerLoadBand(level);
+  const words = pickWords(rand, stickerWordCount(level), new Set(recent), STICKER_POOL[band]);
   return {
     slots: shuffle(rand, words),
     tray: shuffle(rand, words),
