@@ -92,7 +92,7 @@ export function isWordId(id: string): id is WordId {
 }
 
 export function rollRecent(history: readonly (readonly WordId[])[], deal: readonly WordId[]): WordId[][] {
-  return [...history, [...deal]].slice(-STICKER_RECENT_DEALS);
+  return [...history.map((item) => [...item]), [...deal]].slice(-STICKER_RECENT_DEALS);
 }
 
 function pickWords(rand: () => number, count: number, recent: ReadonlySet<WordId>): WordId[] {
