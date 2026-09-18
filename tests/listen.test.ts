@@ -15,6 +15,14 @@ import {
   similarityPeers,
   tryListenTap,
 } from '../src/listen/deal';
+import {
+  LISTEN_LANG_DEFAULT,
+  LISTEN_LANG_KEY,
+  parseListenLang,
+  readListenLang,
+  speakListenWord,
+  writeListenLang,
+} from '../src/listen/speech';
 import { BASIC_POOL, EASY_POOL, PUZZLE_POOL, STICKER_POOL } from '../src/sticker/words';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -181,6 +189,10 @@ describe('listen copy, parent guide, and hub card', () => {
     expect(LISTEN_COPY.title).toBe('聽一聽揀圖');
     expect(LISTEN_COPY.subtitle).toBe('聽到詞之後，點啱嘅圖。');
     expect(LISTEN_COPY.listenAgain).toBe('再聽一次');
+    expect(LISTEN_COPY.langEn).toBe('English');
+    expect(LISTEN_COPY.langYue).toBe('粵語');
+    expect(LISTEN_COPY.controls).toContain('English');
+    expect(LISTEN_COPY.controls).toContain('粵語');
     expect(LISTEN_COPY.next).toBe('下一關');
     expect(LISTEN_COPY.replay).toBe('再玩本關');
     expect(LISTEN_COPY.home).toBe('回 Hub');
@@ -213,8 +225,12 @@ describe('listen copy, parent guide, and hub card', () => {
     expect(play).toMatch(/第 \{\{ level \+ 1 \}\} 關/);
     expect(play).toContain('{{ correct }} / {{ need }}');
     expect(play).toContain('再聽一次');
-    expect(play).toContain('speak(soundOn.value, WORD_ZH[board.value.target])');
-    expect(play).not.toContain('speakEnglish');
+    expect(play).toContain('speakListenWord(soundOn.value, listenLang.value, board.value.target)');
+    expect(play).toContain("setListenLang('en')");
+    expect(play).toContain("setListenLang('yue')");
+    expect(play).toContain('{{ copy.langEn }}');
+    expect(play).toContain('{{ copy.langYue }}');
+    expect(play).not.toMatch(/speakEnglish\(soundOn\.value,\s*WORD_EN\[board\.value\.target\]\)\s*;\s*speak\(/);
     expect(play).not.toMatch(/zh-CN|普通話/);
     expect(play).toContain('>任務<');
     expect(play).toContain('>操作<');
@@ -235,5 +251,30 @@ describe('listen copy, parent guide, and hub card', () => {
     expect(sticker).toContain('speakEnglish');
     expect(picnic + tooth + delivery + sticker).not.toMatch(/listen\/deal|聽一聽揀圖/);
     expect(STICKER_POOL.easy).toEqual(EASY_POOL);
+  });
+});
+
+describe('listen language preference', () => {
+  it('defaults to English and only accepts en or yue', () => {
+    expect(LISTEN_LANG_DEFAULT).toBe('en');
+    expect(parseListenLang(undefined)).toBe('en');
+    expect(parseListenLang('en')).toBe('en');
+    expect(parseListenLang('yue')).toBe('yue');
+    expect(parseListenLang('zh-CN')).toBe('en');
+    expect(parseListenLang('both')).toBe('en');
+  });
+
+  it('persists the chosen language in the provided store', () => {
+    const values: Record<string, string> = {};
+    const memory = {
+      getItem: (key: string) => values[key] ?? null,
+      setItem: (key: string, value: string) => { values[key] = value; },
+    } as Storage;
+    expect(readListenLang(memory)).toBe('en');
+    writeListenLang('yue', memory);
+    expect(values[LISTEN_LANG_KEY]).toBe('yue');
+    expect(readListenLang(memory)).toBe('yue');
+    writeListenLang('en', memory);
+    expect(readListenLang(memory)).toBe('en');
   });
 });
