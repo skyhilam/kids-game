@@ -10,19 +10,38 @@ import {
   isCleared,
   lift,
   placedCount,
+  rollRecent,
   slotOf,
   stickerWordCount,
   tryPlace,
+  WORD_EN,
   WORD_IDS,
+  WORD_ZH,
 } from '../src/sticker/words';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const claims = /貼紙冊|100 枚|智商|智力|大腦/;
 
 describe('sticker word list and deal', () => {
-  it('uses the six shared sprite names as English slots', () => {
-    expect([...WORD_IDS]).toEqual(['burger', 'car', 'home', 'tree', 'flower', 'sun']);
-    for (const id of WORD_IDS) expect(sprites).toHaveProperty(id);
+  it('uses existing sprites, including hyphenated ids mapped to English words', () => {
+    expect(WORD_IDS).toHaveLength(16);
+    expect([...WORD_IDS]).toEqual([
+      'burger', 'car', 'home', 'tree', 'flower', 'sun',
+      'truck', 'parcel', 'bear', 'shop', 'park', 'picnic',
+      'kid', 'tooth', 'toothbrush', 'bug-coral',
+    ]);
+    for (const extra of ['car-top', 'truck-top', 'kid-cheer', 'courier', 'bug-purple'] as const) {
+      expect(WORD_IDS).not.toContain(extra);
+    }
+    for (const id of WORD_IDS) {
+      expect(sprites).toHaveProperty(id);
+      expect(WORD_ZH[id]).toBeTruthy();
+      expect(WORD_EN[id]).toBeTruthy();
+      expect(WORD_EN[id]).not.toMatch(/-/);
+    }
+    expect(WORD_EN['bug-coral']).toBe('bug');
+    expect(WORD_ZH['bug-coral']).toBe('蟲');
+    expect(new Set(Object.values(WORD_EN)).size).toBe(WORD_IDS.length);
   });
 
   it('draws 4/5/6 words from the same pool by load band', () => {
@@ -42,14 +61,41 @@ describe('sticker word list and deal', () => {
     expect(puzzle.tray).toHaveLength(6);
     expect([...easy.slots].sort()).toEqual([...easy.tray].sort());
     expect([...basic.slots].sort()).toEqual([...basic.tray].sort());
-    expect([...puzzle.slots].sort()).toEqual([...WORD_IDS].sort());
+    expect([...puzzle.slots].sort()).toEqual([...puzzle.tray].sort());
     expect(new Set(easy.slots).size).toBe(4);
+    expect(new Set(puzzle.slots).size).toBe(6);
     expect(easy.slots.every((id) => (WORD_IDS as readonly string[]).includes(id))).toBe(true);
+    expect(puzzle.slots.every((id) => (WORD_IDS as readonly string[]).includes(id))).toBe(true);
     expect(dealBoard(7, 0)).toEqual(easy);
     expect(dealBoard(7)).toEqual(easy);
 
     const seenTray = new Set(Array.from({ length: 24 }, (_, seed) => dealBoard(seed, 8).tray.join(',')));
     expect(seenTray.size).toBeGreaterThan(1);
+  });
+
+  it('avoids recent-level words so five consecutive deals do not recycle one small set', () => {
+    let recent: import('../src/sticker/words').WordId[][] = [];
+    const deals = [0, 1, 2, 3, 4].map((level, index) => {
+      const deal = dealBoard(100 + index * 17, level, recent.flat());
+      expect(deal.slots).toHaveLength(stickerWordCount(level));
+      recent = rollRecent(recent, deal.slots);
+      return deal;
+    });
+
+    for (let i = 1; i < deals.length; i += 1) {
+      const prev = new Set(deals[i - 1]!.slots);
+      expect(deals[i]!.slots.some((id) => prev.has(id))).toBe(false);
+      expect(dealBoard(100 + i * 17, i, deals.slice(Math.max(0, i - 2), i).flatMap((item) => item.slots))).toEqual(deals[i]);
+    }
+
+    const union = new Set(deals.flatMap((deal) => deal.slots));
+    expect(union.size).toBeGreaterThan(6);
+    expect(union.size).toBeGreaterThanOrEqual(12);
+
+    const avoid = ['burger', 'car', 'home', 'tree'] as const;
+    const next = dealBoard(3, 0, avoid);
+    expect(next.slots).toHaveLength(4);
+    expect(next.slots.some((id) => (avoid as readonly string[]).includes(id))).toBe(false);
   });
 });
 
@@ -76,7 +122,7 @@ describe('sticker place rules', () => {
       board = next.placed;
     }
     expect(isCleared(board)).toBe(true);
-    expect(placedCount(board)).toBe(6);
+    expect(placedCount(board)).toBe(WORD_IDS.length);
   });
 
   it('clears a banded deal only when every drawn word is correct', () => {
@@ -143,6 +189,7 @@ describe('sticker stages, copy, and hub wiring', () => {
     expect(play).toMatch(/第 \{\{ level \+ 1 \}\} 關/);
     expect(play).toContain(':data-stage="stageLabel"');
     expect(play).toContain('speakEnglish');
+    expect(play).toContain('WORD_EN');
     expect(play).toContain("playCue(soundOn.value, 'collect')");
     expect(play).toContain("playCue(soundOn.value, 'hint')");
     expect(play).toContain('>任務<');
@@ -152,9 +199,12 @@ describe('sticker stages, copy, and hub wiring', () => {
     expect(play).toContain('回 Hub');
     expect(play).toContain('nextLevel');
     expect(play).toContain('dealLevel(level.value + 1)');
-    expect(play).toContain('dealBoard(randomSeed(), nextLevel)');
+    expect(play).toContain('dealBoard(randomSeed(), nextLevel, recentDeals.value.flat())');
+    expect(play).toContain('rollRecent');
     expect(play).toContain('usePlayAudio');
+    expect(play).toContain('speakEnglish(soundOn.value, WORD_EN[id])');
     expect(play).not.toMatch(/speak\(soundOn\.value,\s*id\)/);
+    expect(play).not.toMatch(/speakEnglish\(soundOn\.value,\s*id\)/);
     expect(play).not.toMatch(/貼紙冊|100 枚/);
 
     const picnic = readFileSync(join(root, 'src/components/PicnicPlay.vue'), 'utf8');
