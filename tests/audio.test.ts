@@ -86,8 +86,12 @@ describe('shared play cues', () => {
     const listen = readFileSync(join(root, 'src/components/ListenPlay.vue'), 'utf8');
     expect(listen).toContain('usePlayAudio');
     expect(listen).toContain("soundOn ? '關閉音效' : '開啟音效'");
-    expect(listen).toContain('speak(soundOn.value, WORD_ZH[board.value.target])');
-    expect(listen).not.toContain('speakEnglish');
+    expect(listen).toContain('speakListenWord(soundOn.value, listenLang.value, board.value.target)');
+    expect(listen).toContain('copy.langEn');
+    expect(listen).toContain('copy.langYue');
+    expect(listen).toContain("setListenLang('en')");
+    expect(listen).toContain("setListenLang('yue')");
+    expect(listen).not.toMatch(/speak\(soundOn\.value,\s*WORD_ZH\[board\.value\.target\]\)/);
   });
 });
 
@@ -227,5 +231,46 @@ describe('mute gates synthesis and speech', () => {
     expect(uttered.text).toBe('car');
     expect(uttered.lang).toMatch(/^en/i);
     expect(uttered.voice).toBeNull();
+  });
+
+  it('speaks only English or only Cantonese for a listen word, never both', async () => {
+    speech.getVoices = () => [
+      { lang: 'zh-HK', name: 'Sinji' } as SpeechSynthesisVoice,
+      { lang: 'en-US', name: 'Samantha' } as SpeechSynthesisVoice,
+    ];
+    const { speakListenWord } = await import('../src/listen/speech');
+    const { WORD_EN, WORD_ZH } = await import('../src/sticker/words');
+
+    speakListenWord(true, 'en', 'car');
+    expect(speech.speak).toHaveBeenCalledOnce();
+    const english = speech.speak.mock.calls[0]![0] as SpeechSynthesisUtterance;
+    expect(english.text).toBe(WORD_EN.car);
+    expect(english.lang).toMatch(/^en/i);
+
+    speech.speak.mockReset();
+    speakListenWord(true, 'yue', 'car');
+    expect(speech.speak).toHaveBeenCalledOnce();
+    const yue = speech.speak.mock.calls[0]![0] as SpeechSynthesisUtterance;
+    expect(yue.text).toBe(WORD_ZH.car);
+    expect(yue.voice?.lang).toMatch(/zh-HK|yue/i);
+  });
+
+  it('keeps listen muted in both languages and skips Mandarin fallback', async () => {
+    speech.getVoices = () => [
+      { lang: 'zh-CN', name: 'Tingting' } as SpeechSynthesisVoice,
+      { lang: 'en-US', name: 'Samantha' } as SpeechSynthesisVoice,
+    ];
+    const { speakListenWord } = await import('../src/listen/speech');
+
+    speakListenWord(false, 'en', 'sun');
+    speakListenWord(false, 'yue', 'sun');
+    expect(speech.speak).not.toHaveBeenCalled();
+
+    speakListenWord(true, 'yue', 'sun');
+    expect(speech.speak).not.toHaveBeenCalled();
+
+    speakListenWord(true, 'en', 'sun');
+    expect(speech.speak).toHaveBeenCalledOnce();
+    expect((speech.speak.mock.calls[0]![0] as SpeechSynthesisUtterance).text).toBe('sun');
   });
 });

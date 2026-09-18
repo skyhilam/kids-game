@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue';
 import { usePlayAudio } from '../composables/usePlayAudio';
-import { cancelSpeech, initAudio, playCue, speak } from '../game/audio';
+import { cancelSpeech, initAudio, playCue } from '../game/audio';
 import { randomSeed } from '../game/rng';
 import { listenLoadBand, parentCopy, STAGE_LABEL } from '../game/stages';
 import { LISTEN_COPY as copy } from '../listen/copy';
@@ -12,6 +12,12 @@ import {
   tryListenTap,
   type ListenDeal,
 } from '../listen/deal';
+import {
+  readListenLang,
+  speakListenWord,
+  writeListenLang,
+  type ListenLang,
+} from '../listen/speech';
 import { WORD_ZH, type WordId } from '../sticker/words';
 import GameSprite from './GameSprite.vue';
 import MazeDialog from './MazeDialog.vue';
@@ -20,6 +26,7 @@ import PlayChrome from './PlayChrome.vue';
 
 const emit = defineEmits<{ home: [] }>();
 const { soundOn, toastText, toastOn, toast, toggleSound } = usePlayAudio();
+const listenLang = ref<ListenLang>(readListenLang());
 
 const overlay = ref<'welcome' | 'help' | 'win' | null>('welcome');
 const level = ref(0);
@@ -51,7 +58,14 @@ const optionColumns = computed(() => {
 });
 
 function speakTarget(): void {
-  speak(soundOn.value, WORD_ZH[board.value.target]);
+  speakListenWord(soundOn.value, listenLang.value, board.value.target);
+}
+
+function setListenLang(next: ListenLang): void {
+  if (listenLang.value === next) return;
+  listenLang.value = next;
+  writeListenLang(next);
+  if (playing.value) speakTarget();
 }
 
 function mintDeal(nextLevel: number): void {
@@ -176,7 +190,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="app listen-game">
+  <main class="app listen-game" :data-listen-lang="listenLang">
     <header class="topbar">
       <div class="brand">
         <div class="brand-logo" aria-hidden="true"><GameSprite name="kid"/></div>
@@ -188,6 +202,23 @@ onUnmounted(() => {
       </div>
       <div class="top-actions">
         <button class="action-button" type="button" @click="emit('home')">選擇遊戲</button>
+        <div
+          class="listen-lang"
+          role="group"
+          :aria-label="copy.langLabel"
+          :data-listen-lang="listenLang"
+        >
+          <button
+            type="button"
+            :aria-pressed="listenLang === 'en'"
+            @click="setListenLang('en')"
+          >{{ copy.langEn }}</button>
+          <button
+            type="button"
+            :aria-pressed="listenLang === 'yue'"
+            @click="setListenLang('yue')"
+          >{{ copy.langYue }}</button>
+        </div>
         <button
           class="icon-button"
           :aria-label="soundOn ? '關閉音效' : '開啟音效'"
@@ -302,6 +333,23 @@ onUnmounted(() => {
         <h2 id="listen-dialog-title" class="dialog-title">{{ copy.title }}</h2>
         <p class="stage-chip" :data-stage="stageLabel">第 {{ level + 1 }} 關 · {{ stageLabel }}</p>
         <p class="dialog-copy">{{ copy.welcomeBody }}</p>
+        <div
+          class="listen-lang listen-lang-dialog"
+          role="group"
+          :aria-label="copy.langLabel"
+          :data-listen-lang="listenLang"
+        >
+          <button
+            type="button"
+            :aria-pressed="listenLang === 'en'"
+            @click="setListenLang('en')"
+          >{{ copy.langEn }}</button>
+          <button
+            type="button"
+            :aria-pressed="listenLang === 'yue'"
+            @click="setListenLang('yue')"
+          >{{ copy.langYue }}</button>
+        </div>
         <button class="primary-button" type="button" autofocus @click="beginPlay">
           {{ copy.start }}<svg><use href="#i-arrow"/></svg>
         </button>
@@ -367,6 +415,10 @@ onUnmounted(() => {
 .listen-game .brand-logo{background:#e4eef2}
 .listen-game .brand{flex-wrap:wrap}
 .listen-game .stage-chip{align-self:center}
+.listen-lang{display:flex;padding:4px;border-radius:16px;background:#e8ecdf;gap:4px}
+.listen-lang button{min-height:40px;padding:8px 14px;background:transparent;border-radius:12px;color:#7e8a76;font-size:13px}
+.listen-lang button[aria-pressed=true]{background:#fffdf7;box-shadow:0 2px 5px #4b614110;color:#4c6d5d}
+.listen-lang-dialog{width:fit-content;margin:0 auto 16px}
 .board.listen-board{background:#e4eef2;display:flex;flex-direction:column;gap:16px;padding:42px 18px 16px;aspect-ratio:auto;height:auto;min-height:520px;overflow:visible}
 .listen-board .board-note{top:12px}
 .listen-dialog{width:min(640px,calc(100vw - 32px))}
@@ -384,6 +436,8 @@ onUnmounted(() => {
   .listen-options{flex:none;gap:10px}
   .listen-option{min-height:112px;padding:8px}
   .listen-option svg{width:72px;height:66px}
+  .listen-game .top-actions{flex-wrap:wrap}
+  .listen-lang button{min-height:36px;padding:6px 10px;font-size:12px}
 }
 @media(max-width:420px){
   .listen-option{min-height:100px;border-radius:18px}
