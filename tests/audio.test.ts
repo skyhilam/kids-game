@@ -87,8 +87,10 @@ describe('shared play cues', () => {
     expect(listen).toContain('usePlayAudio');
     expect(listen).toContain("soundOn ? '關閉音效' : '開啟音效'");
     expect(listen).toContain('speakListenWord(soundOn.value, listenLang.value, board.value.target)');
-    expect(listen).toContain('English');
-    expect(listen).toContain('粵語');
+    expect(listen).toContain('copy.langEn');
+    expect(listen).toContain('copy.langYue');
+    expect(listen).toContain("setListenLang('en')");
+    expect(listen).toContain("setListenLang('yue')");
     expect(listen).not.toMatch(/speak\(soundOn\.value,\s*WORD_ZH\[board\.value\.target\]\)/);
   });
 });
