@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue';
+import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue';
 import { atlases, sprites, type SpriteName } from '../art/sprites';
-import { activeImages } from '../studio/store';
+import { activeSprites, type AppliedSprite } from '../studio/store';
 
 const props = defineProps<{
   name: SpriteName;
@@ -13,14 +13,33 @@ const props = defineProps<{
 
 const sprite = computed(() => sprites[props.name]);
 const atlas = computed(() => atlases[sprite.value.atlas]);
-const generated = computed(() => props.original ? undefined : (activeImages.value as Partial<Record<SpriteName, string>>)[props.name]);
+const generated = computed(() => props.original ? undefined : (activeSprites.value as Partial<Record<SpriteName, AppliedSprite>>)[props.name]);
+const frame = ref(0);
+const frameRect = computed(() => generated.value
+  ? [frame.value % generated.value.columns * 128, Math.floor(frame.value / generated.value.columns) * 128, 128, 128]
+  : sprite.value.frame);
 const clipId = `sprite-clip-${useId()}`;
+let request = 0; let mounted = false;
+function restartPlayback() {
+  cancelAnimationFrame(request); frame.value = 0;
+  const animation = generated.value;
+  if (!mounted || document.hidden || !animation || animation.frames < 2) return;
+  const start = performance.now();
+  function tick(now: number) {
+    frame.value = Math.floor(Math.max(0, now - start) * animation!.fps / 1000) % animation!.frames;
+    request = requestAnimationFrame(tick);
+  }
+  request = requestAnimationFrame(tick);
+}
+watch(generated, restartPlayback);
+onMounted(() => { mounted = true; restartPlayback(); document.addEventListener('visibilitychange', restartPlayback); });
+onUnmounted(() => { mounted = false; cancelAnimationFrame(request); document.removeEventListener('visibilitychange', restartPlayback); });
 </script>
 
 <template>
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    :viewBox="generated ? '0 0 128 128' : sprite.frame.join(' ')"
+    :viewBox="frameRect.join(' ')"
     width="100%"
     height="100%"
     preserveAspectRatio="xMidYMid meet"
@@ -31,13 +50,15 @@ const clipId = `sprite-clip-${useId()}`;
     overflow="hidden"
     :data-sprite="name"
     :data-generated="generated ? true : undefined"
+    :data-animated="generated && generated.frames > 1 ? true : undefined"
+    :data-frame="generated && generated.frames > 1 ? frame : undefined"
   >
-    <image v-if="generated" :href="generated" width="128" height="128"/>
-    <defs v-if="!generated">
+    <defs>
       <clipPath :id="clipId" clipPathUnits="userSpaceOnUse">
-        <rect :x="sprite.frame[0]" :y="sprite.frame[1]" :width="sprite.frame[2]" :height="sprite.frame[3]"/>
+        <rect :x="frameRect[0]" :y="frameRect[1]" :width="frameRect[2]" :height="frameRect[3]"/>
       </clipPath>
     </defs>
+    <image v-if="generated" :href="generated.image" :width="generated.columns * 128" :height="generated.rows * 128" :clip-path="`url(#${clipId})`"/>
     <image v-if="!generated" :href="atlas.src" :width="atlas.width" :height="atlas.height" :clip-path="`url(#${clipId})`"/>
   </svg>
 </template>

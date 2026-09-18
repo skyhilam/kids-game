@@ -6,6 +6,7 @@ import { renderSheet, sheetMetadata, sheetPack } from '../src/studio/sheet';
 import { actionFrames } from '../src/studio/actionFrames';
 import { importAnimation, generatedFrames, sourceKey } from '../src/studio/generation';
 import { buildReferenceCanvas, normalizePoseFrames, spriteBounds, spritePipelineVersion } from '../src/studio/spritePipeline';
+import { verifyAppliedPlayback } from './applied-sprites-browser';
 
 // Real browser Canvas checks: visit /kids-game/tests/studio-browser.html with the Vite dev server.
 const failures: string[] = [];
@@ -119,6 +120,7 @@ async function verify() {
   const generated = await generatedFrames(generationRecipe);
   assert(generated.map(frame => frame.toDataURL()).join() === fixtureImages.join(), 'generated poses altered during decode');
   const generatedSheet = await renderSheet(generationRecipe);
+  await verifyAppliedPlayback(fixtureImages, assert);
   const firstCrop = document.createElement('canvas'); firstCrop.width = firstCrop.height = 256;
   firstCrop.getContext('2d')!.drawImage(generatedSheet, 0, 0, 256, 256, 0, 0, 256, 256);
   assert(firstCrop.toDataURL() === fixtureImages[0], 'generated frames were transformed again');
@@ -215,7 +217,7 @@ async function verify() {
     request.onsuccess = () => { const db = request.result; const tx = db.transaction('actions', 'readwrite'); for (const id of [fixture.id, ...atlasIds]) tx.objectStore('actions').delete(id); tx.oncomplete = () => { db.close(); resolve(); }; tx.onerror = reject; };
     request.onerror = reject;
   });
-  const report = { models: modelNames.length, renders, actionSheets, handChange, openEyePixels, closedEyePixels, pngBytes: png.size, zipBytes: pack.size, atlasChecks, referenceChecks, pipelineNormalization: true, generatedPackBytes: generatedPack.size, portablePoses: designHasPoses, duplicateRejected, opaqueRejected, failures };
+  const report = { models: modelNames.length, renders, actionSheets, handChange, openEyePixels, closedEyePixels, pngBytes: png.size, zipBytes: pack.size, atlasChecks, referenceChecks, pipelineNormalization: true, gamePlayback: true, generatedPackBytes: generatedPack.size, portablePoses: designHasPoses, duplicateRejected, opaqueRejected, failures };
   document.querySelector('#report')!.textContent = JSON.stringify(report, null, 2);
   document.querySelector('#status')!.textContent = failures.length ? `FAIL: ${failures.length} checks failed` : `PASS: ${modelNames.length} models / ${renders} renders / ${actionSheets} action sheets / portable generated-frame fixture`;
   document.body.dataset.result = failures.length ? 'fail' : 'pass';

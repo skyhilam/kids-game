@@ -6,6 +6,7 @@ import { renderToString } from 'vue/server-renderer';
 import { describe, expect, it } from 'vitest';
 import GameSprite from '../src/components/GameSprite.vue';
 import { atlases, sprites } from '../src/art/sprites';
+import { activeSprites } from '../src/studio/store';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -88,6 +89,20 @@ describe('shared game artwork', () => {
     const html = await renderToString(createSSRApp({ render: () => h(GameSprite, { name: 'tooth' }) }));
     expect(html).toContain('aria-hidden="true"');
     expect(html).not.toContain('role="img"');
+  });
+
+  it('renders applied animation cells with clipping in wide board viewports and preserves original comparisons', async () => {
+    activeSprites.value = { 'car-top': { image: 'data:image/png;base64,test-animation', frames: 8, fps: 12, columns: 4, rows: 2 } };
+    try {
+      const html = await renderToString(createSSRApp({ render: () => h(GameSprite, { name: 'car-top', width: 100, height: 66 }) }));
+      expect(html).toContain('data-animated="true"'); expect(html).toContain('data-frame="0"');
+      expect(html).toContain('width="512" height="256"');
+      expect(html).toContain('<rect x="0" y="0" width="128" height="128"');
+      expect(html).toContain('clip-path="url(#sprite-clip-');
+      const original = await renderToString(createSSRApp({ render: () => h(GameSprite, { name: 'car-top', original: true }) }));
+      expect(original).not.toContain('data-animated'); expect(original).not.toContain('test-animation');
+      expect(original.toLowerCase()).toContain(`viewbox="${sprites['car-top'].frame.join(' ')}"`);
+    } finally { activeSprites.value = {}; }
   });
 
   it('clips neighboring artwork even in wide or tall containers, with unique local masks', async () => {

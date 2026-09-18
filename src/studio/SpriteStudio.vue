@@ -5,11 +5,11 @@ import { randomSeed } from '../game/rng';
 import { contextKey, kits, levelInfo, models, type GameKind, type ModelName, type StudioContext } from './catalog';
 import CanvasSprite from './CanvasSprite.vue';
 import SpriteSheet from './SpriteSheet.vue';
-import { hasGeneratedAction, importAnimation, readJob } from './generation';
+import { hasBuiltInAction, hasGeneratedAction, importAnimation, readJob } from './generation';
 import { renderSprite } from './draw';
 import { download, pngBlob } from './download';
 import { exportDesign, fileStem, generateRecipe, initialRecipe, paletteColors, palettes, parseDesign, recipeKey, type Lockable, type PaletteName, type Recipe } from './recipe';
-import { applySprite, completeSprite, initializeLibrary, library, restoreSprite, storageWarning, styleNotice } from './store';
+import { activeSprites, applySprite, completeSprite, initializeLibrary, library, restoreSprite, storageWarning, styleNotice } from './store';
 
 const emit = defineEmits<{ home: [] }>();
 initializeLibrary();
@@ -34,7 +34,9 @@ const completed = computed(() => !!saved.value && recipeKey(saved.value.recipe) 
 const completedCount = computed(() => currentKit.value.sprites.filter(name => library.value.records[contextKey(context.value, name)]).length);
 const isApplied = computed(() => {
   const applied = library.value.active[selected.value];
-  return !!applied && recipeKey(applied) === recipeKey(recipe.value);
+  const rendered = activeSprites.value[selected.value];
+  return !!applied && !!rendered && recipeKey(applied) === recipeKey(recipe.value)
+    && (!(hasBuiltInAction(recipe.value) || hasGeneratedAction(recipe.value)) || rendered.frames > 1);
 });
 const drafts = new Map<string, Recipe>();
 const versionCount = computed(() => Object.keys(library.value.records).length);
@@ -82,8 +84,8 @@ function nextUnfinished() {
 }
 async function apply() {
   applying.value = true;
-  try { await applySprite(recipe.value); message.value = '已套用。返回遊戲即可查看；此瀏覽器內所有同名素材都會更新。'; error.value = ''; }
-  catch { error.value = '未能套用素材，請重新載入後再試。'; }
+  try { await applySprite(recipe.value); message.value = '已套用。返回遊戲即可查看；有動作影格的素材會依設定速度循環播放。'; error.value = ''; }
+  catch (cause) { error.value = cause instanceof Error ? cause.message : '未能套用素材，請重新載入後再試。'; }
   finally { applying.value = false; }
 }
 function restore() { restoreSprite(selected.value); message.value = '已恢復這個素材的原有插畫。'; }
@@ -200,7 +202,7 @@ loadSelected();
       <p class="library-note">完成紀錄存於此瀏覽器，最近 8 個顯示於此；其他版本可從對應遊戲與關卡找回。下載 JSON 可另行備份。</p>
     </section>
 
-    <section class="try-game studio-panel"><div><h2>放進遊戲，看看合不合適</h2><p>套用後，此瀏覽器中所有「{{ models[selected].label }}」會使用目前單張造型，也可隨時恢復。動畫請下載 Sprite 素材包。</p></div><div><button class="soft-button" type="button" :disabled="!library.active[selected]" @click="restore">恢復原有插畫</button><button class="complete-button" type="button" :disabled="isApplied || applying" @click="apply">{{ applying ? '合成中…' : isApplied ? '✓ 正在使用' : '套用這個素材' }}</button></div></section>
+    <section class="try-game studio-panel"><div><h2>放進遊戲，看看合不合適</h2><p>套用後，此瀏覽器中所有「{{ models[selected].label }}」會使用目前造型；有動作影格時依設定 FPS 循環播放，未有影格時顯示單張造型。可隨時恢復原畫。</p><p v-if="selected === 'car'">「小車」用於封面及說明；野餐棋盤使用「小車・俯視」，請分別套用。</p><p v-else-if="selected === 'car-top'">「小車・俯視」用於野餐棋盤上的車輛。</p></div><div><button class="soft-button" type="button" :disabled="!library.active[selected]" @click="restore">恢復原有插畫</button><button class="complete-button" type="button" :disabled="isApplied || applying" @click="apply">{{ applying ? '合成中…' : isApplied ? '✓ 正在使用' : '套用這個素材' }}</button></div></section>
     <footer class="studio-footer"><span>✳ 小小素材工房 · 原畫合成 · 角色動作生成</span><span>流程參考 <a href="https://pixel-gen.syngamelab.com/" target="_blank" rel="noopener noreferrer">Doll Atelier ↗</a> · <a href="https://developers.openai.com/api/docs/guides/image-generation" target="_blank" rel="noopener noreferrer">OpenAI 圖像 API ↗</a></span></footer>
   </main>
 </template>

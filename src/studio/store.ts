@@ -6,13 +6,25 @@ import { spriteDataUrl } from './draw';
 export const STORAGE_KEY = 'picnic-sprite-studio-v1';
 export type SavedSprite = { context: StudioContext; recipe: Recipe; completedAt: string };
 export type StudioLibrary = { version: 1; records: Record<string, SavedSprite>; active: Partial<Record<ModelName, Recipe>> };
+export type AppliedSprite = { image: string; frames: number; fps: number; columns: number; rows: number };
 const emptyLibrary = (): StudioLibrary => ({ version: 1, records: {}, active: {} });
 export const library = shallowRef<StudioLibrary>(emptyLibrary());
-export const activeImages = shallowRef<Partial<Record<ModelName, string>>>({});
+export const activeSprites = shallowRef<Partial<Record<ModelName, AppliedSprite>>>({});
 export const storageWarning = shallowRef('');
 export const styleNotice = shallowRef('');
 const applyJobs = new Map<ModelName, number>();
 let loaded = false;
+
+async function renderAppliedSprite(recipe: Recipe): Promise<AppliedSprite> {
+  const { hasBuiltInAction, hasGeneratedAction } = await import('./generation');
+  if (hasBuiltInAction(recipe) || hasGeneratedAction(recipe)) {
+    const { renderSheet } = await import('./sheet');
+    const canvas = await renderSheet({ ...recipe, size: 256 });
+    const columns = Math.min(recipe.sheet.columns, recipe.sheet.frames);
+    return { image: canvas.toDataURL('image/png'), frames: recipe.sheet.frames, fps: recipe.sheet.fps, columns, rows: Math.ceil(recipe.sheet.frames / columns) };
+  }
+  return { image: await spriteDataUrl(recipe), frames: 1, fps: 1, columns: 1, rows: 1 };
+}
 
 export function parseLibrary(raw: string): StudioLibrary {
   const data = JSON.parse(raw);
@@ -45,9 +57,14 @@ export function initializeLibrary(): void {
     }
     for (const recipe of Object.values(library.value.active)) {
       const job = applyJobs.get(recipe.sprite) ?? 0;
-      void spriteDataUrl(recipe).then(url => {
+      void renderAppliedSprite(recipe).catch(async () => {
         if ((applyJobs.get(recipe.sprite) ?? 0) === job && library.value.active[recipe.sprite]) {
-          activeImages.value = { ...activeImages.value, [recipe.sprite]: url };
+          storageWarning.value = '未能載入已套用的動作影格；暫時顯示單張造型。請載入原先的設計 JSON，再套用素材。';
+        }
+        return { image: await spriteDataUrl(recipe), frames: 1, fps: 1, columns: 1, rows: 1 };
+      }).then(sprite => {
+        if ((applyJobs.get(recipe.sprite) ?? 0) === job && library.value.active[recipe.sprite]) {
+          activeSprites.value = { ...activeSprites.value, [recipe.sprite]: sprite };
         }
       }).catch(() => { storageWarning.value = '未能載入已套用的原畫；暫時顯示遊戲素材，請重新載入後再試。'; });
     }
@@ -72,14 +89,14 @@ export function completeSprite(context: StudioContext, recipe: Recipe): boolean 
 export async function applySprite(recipe: Recipe): Promise<boolean> {
   const clean = parseRecipe(recipe);
   const job = (applyJobs.get(clean.sprite) ?? 0) + 1; applyJobs.set(clean.sprite, job);
-  const url = await spriteDataUrl(clean);
+  const sprite = await renderAppliedSprite(clean);
   if (applyJobs.get(clean.sprite) !== job) return false;
-  activeImages.value = { ...activeImages.value, [clean.sprite]: url };
+  activeSprites.value = { ...activeSprites.value, [clean.sprite]: sprite };
   return commit({ ...library.value, active: { ...library.value.active, [clean.sprite]: clean } });
 }
 export function restoreSprite(name: ModelName): boolean {
   applyJobs.set(name, (applyJobs.get(name) ?? 0) + 1);
   const active = { ...library.value.active }; delete active[name];
-  const images = { ...activeImages.value }; delete images[name]; activeImages.value = images;
+  const images = { ...activeSprites.value }; delete images[name]; activeSprites.value = images;
   return commit({ ...library.value, active });
 }
