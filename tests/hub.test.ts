@@ -35,8 +35,22 @@ describe('hub landing metadata', () => {
     expect(hub).toMatch(/<strong>貼紙學單字<\/strong>/);
     expect(hub).toMatch(/拖貼紙配英文詞，全部放對就過關/);
     expect(hub).toMatch(/emit\('pick', 'sticker'\)/);
-    expect(app).toMatch(/'hub' \| 'picnic' \| 'tooth' \| 'delivery' \| 'sticker'/);
+    expect(app).toMatch(/'hub' \| 'picnic' \| 'tooth' \| 'delivery' \| 'sticker' \| 'listen'/);
     expect(app).toMatch(/StickerPlay/);
-    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(4);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(5);
+  });
+
+  it('adds 聽一聽揀圖 as a fifth card with listen activity', () => {
+    const hub = readFileSync(join(root, 'src/components/Hub.vue'), 'utf8');
+    const app = readFileSync(join(root, 'src/App.vue'), 'utf8');
+    expect(hub).toMatch(/<strong>聽一聽揀圖<\/strong>/);
+    expect(hub).toMatch(/聽到詞之後，點啱嘅圖。/);
+    expect(hub).toMatch(/STAGE_OVERVIEW.*聽詞揀圖|聽詞揀圖/);
+    expect(hub).toMatch(/emit\('pick', 'listen'\)/);
+    expect(app).toMatch(/ListenPlay/);
+    expect(app).toMatch(/activity === 'listen'/);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(5);
+    expect(hub).toMatch(/emit\('pick', 'picnic'\)/);
+    expect(hub).toMatch(/emit\('pick', 'sticker'\)/);
   });
 });

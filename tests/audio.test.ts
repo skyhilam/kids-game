@@ -82,6 +82,12 @@ describe('shared play cues', () => {
     expect(sticker).toContain('speakEnglish');
     expect(sticker).toContain('#i-sound');
     expect(sticker).not.toMatch(/speak\(soundOn\.value,\s*id\)/);
+
+    const listen = readFileSync(join(root, 'src/components/ListenPlay.vue'), 'utf8');
+    expect(listen).toContain('usePlayAudio');
+    expect(listen).toContain("soundOn ? '關閉音效' : '開啟音效'");
+    expect(listen).toContain('speak(soundOn.value, WORD_ZH[board.value.target])');
+    expect(listen).not.toContain('speakEnglish');
   });
 });
 
@@ -203,6 +209,13 @@ describe('mute gates synthesis and speech', () => {
     expect(uttered.lang).toMatch(/^en/i);
     expect(uttered.voice?.lang).toMatch(/^en/i);
     expect(uttered.voice?.lang).not.toMatch(/zh-HK|yue/i);
+  });
+
+  it('does not fall back to Mandarin when no Cantonese voice is present', async () => {
+    speech.getVoices = () => [{ lang: 'zh-CN', name: 'Tingting' } as SpeechSynthesisVoice];
+    const { speak } = await import('../src/game/audio');
+    speak(true, '小車');
+    expect(speech.speak).not.toHaveBeenCalled();
   });
 
   it('does not attach a Cantonese voice when speaking English without an English voice', async () => {

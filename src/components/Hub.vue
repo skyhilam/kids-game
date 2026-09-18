@@ -2,7 +2,7 @@
 import { STAGE_OVERVIEW } from '../game/stages';
 import GameSprite from './GameSprite.vue';
 const emit = defineEmits<{
-  pick: [activity: 'picnic' | 'tooth' | 'delivery' | 'sticker'];
+  pick: [activity: 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen'];
 }>();
 </script>
 
@@ -68,6 +68,17 @@ const emit = defineEmits<{
         <strong>貼紙學單字</strong>
         <span>拖貼紙配英文詞，全部放對就過關</span>
         <small class="hub-modes">{{ STAGE_OVERVIEW }} · 圖詞配對</small>
+      </button>
+      <button class="hub-card" type="button" @click="emit('pick', 'listen')">
+        <svg class="hub-art" viewBox="0 0 220 120" aria-hidden="true">
+          <rect width="220" height="120" rx="22" fill="#e8f0f4"/>
+          <GameSprite name="kid" x="8" y="6" width="78" height="108"/>
+          <GameSprite name="sun" x="92" y="22" width="56" height="54"/>
+          <GameSprite name="car" x="138" y="36" width="72" height="58"/>
+        </svg>
+        <strong>聽一聽揀圖</strong>
+        <span>聽到詞之後，點啱嘅圖。</span>
+        <small class="hub-modes">{{ STAGE_OVERVIEW }} · 聽詞揀圖</small>
       </button>
     </div>
   </main>

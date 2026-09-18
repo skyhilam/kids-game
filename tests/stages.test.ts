@@ -8,6 +8,7 @@ import {
   STAGE_LABEL,
   STAGE_OVERVIEW,
   STAGE_PICK_INTRO,
+  listenLoadBand,
   stickerLoadBand,
 } from '../src/game/stages';
 
@@ -65,6 +66,13 @@ describe('generator load bands and parent copy', () => {
     expect(parentCopy.sticker.easy.show).toContain('家長拖一張放對並等英文讀出');
     expect(parentCopy.sticker.basic.ask).not.toBe(parentCopy.sticker.easy.ask);
     expect(parentCopy.sticker.puzzle.show).not.toBe(parentCopy.sticker.basic.show);
+    expect(listenLoadBand(0)).toBe(mazeLoadBand(0));
+    expect(listenLoadBand(8)).toBe(mazeLoadBand(8));
+    expect(parentCopy.listen.easy.goal).toBe('聽完粵語詞，喺 3 張圖入面點啱嗰張。');
+    expect(parentCopy.listen.basic.ask).toContain('邊兩張好似');
+    expect(parentCopy.listen.puzzle.show).toContain('再聽一次');
+    expect(parentCopy.listen.easy.goal).not.toBe(parentCopy.listen.basic.goal);
+    expect(parentCopy.listen.basic.ask).not.toBe(parentCopy.listen.puzzle.ask);
     expect(JSON.stringify({ parentCopy, STAGE_PICK_INTRO })).not.toMatch(claims);
   });
 });
