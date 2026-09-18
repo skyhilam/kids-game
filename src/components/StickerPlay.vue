@@ -7,10 +7,13 @@ import { parentCopy, STAGE_LABEL, stickerLoadBand } from '../game/stages';
 import { STICKER_COPY as copy } from '../sticker/copy';
 import {
   dealBoard,
+  isWordId,
   lift,
   placedCount,
+  rollRecent,
   slotOf,
   tryPlace,
+  WORD_EN,
   WORD_IDS,
   WORD_ZH,
   type PlacedMap,
@@ -28,6 +31,7 @@ const { soundOn, toastText, toastOn, toast, toggleSound } = usePlayAudio();
 const overlay = ref<'welcome' | 'help' | 'win' | null>('welcome');
 const level = ref(0);
 const board = ref<StickerDeal>(dealBoard(randomSeed(), 0));
+const recentDeals = ref<WordId[][]>([board.value.slots]);
 const placed = reactive<PlacedMap>({});
 const shakeSlot = ref<WordId | null>(null);
 const message = ref<string>(copy.guideMain);
@@ -67,7 +71,8 @@ function applyPlaced(next: PlacedMap): void {
 
 function dealLevel(nextLevel: number): void {
   level.value = nextLevel;
-  board.value = dealBoard(randomSeed(), nextLevel);
+  board.value = dealBoard(randomSeed(), nextLevel, recentDeals.value.flat());
+  recentDeals.value = rollRecent(recentDeals.value, board.value.slots);
   resetPlaced();
   message.value = copy.guideMain;
   overlay.value = null;
@@ -78,7 +83,7 @@ function dealLevel(nextLevel: number): void {
 function slotAtPoint(x: number, y: number): WordId | null {
   const node = document.elementFromPoint(x, y)?.closest('[data-word-slot]');
   const id = node?.getAttribute('data-word-slot');
-  return id && (WORD_IDS as readonly string[]).includes(id) ? id as WordId : null;
+  return id && isWordId(id) ? id : null;
 }
 
 function unbindDrag(): void {
@@ -124,8 +129,8 @@ function finishDrag(event: PointerEvent): void {
   if (result.kind === 'correct') {
     applyPlaced(result.placed);
     playCue(soundOn.value, 'collect');
-    speakEnglish(soundOn.value, id);
-    message.value = `對喇，${id}`;
+    speakEnglish(soundOn.value, WORD_EN[id]);
+    message.value = `對喇，${WORD_EN[id]}`;
     if (result.cleared) {
       overlay.value = 'win';
       playCue(soundOn.value, 'win');
@@ -286,7 +291,7 @@ onUnmounted(() => {
             }"
             :data-word-slot="word"
             role="listitem"
-            :aria-label="`英文詞 ${word}`"
+            :aria-label="`英文詞 ${WORD_EN[word]}`"
           >
             <button
               v-if="placed[word] && drag?.id !== placed[word]"
@@ -299,7 +304,7 @@ onUnmounted(() => {
               <GameSprite :name="placed[word]!" :label="WORD_ZH[placed[word]!]" />
             </button>
             <span class="word-label">
-              {{ word }}
+              {{ WORD_EN[word] }}
               <small v-if="placed[word] && drag?.id !== placed[word]" aria-hidden="true">✓</small>
             </span>
           </div>

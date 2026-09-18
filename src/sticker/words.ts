@@ -2,7 +2,24 @@ import type { SpriteName } from '../art/sprites';
 import { mulberry32, shuffle } from '../game/rng';
 import { stickerLoadBand, type LoadBand } from '../game/stages';
 
-export const WORD_IDS = ['burger', 'car', 'home', 'tree', 'flower', 'sun'] as const satisfies readonly SpriteName[];
+export const WORD_IDS = [
+  'burger',
+  'car',
+  'home',
+  'tree',
+  'flower',
+  'sun',
+  'truck',
+  'parcel',
+  'bear',
+  'shop',
+  'park',
+  'picnic',
+  'kid',
+  'tooth',
+  'toothbrush',
+  'bug-coral',
+] as const satisfies readonly SpriteName[];
 
 export type WordId = (typeof WORD_IDS)[number];
 
@@ -18,6 +35,9 @@ export const STICKER_LOAD_COUNT: Record<LoadBand, number> = {
   basic: 5,
   puzzle: 6,
 };
+
+/** Prior deals whose words are avoided when the pool still has unused items. */
+export const STICKER_RECENT_DEALS = 2;
 
 export function stickerWordCount(level = 0): number {
   return STICKER_LOAD_COUNT[stickerLoadBand(level)];
@@ -35,11 +55,56 @@ export const WORD_ZH: Record<WordId, string> = {
   tree: '樹',
   flower: '花',
   sun: '太陽',
+  truck: '貨車',
+  parcel: '包裹',
+  bear: '小熊',
+  shop: '商店',
+  park: '公園',
+  picnic: '野餐',
+  kid: '小朋友',
+  tooth: '牙齒',
+  toothbrush: '牙刷',
+  'bug-coral': '蟲',
 };
 
-export function dealBoard(seed: number, level = 0): StickerDeal {
+/** English TTS / UI label. Differs from WordId when the sprite id is not the spoken word. */
+export const WORD_EN: Record<WordId, string> = {
+  burger: 'burger',
+  car: 'car',
+  home: 'home',
+  tree: 'tree',
+  flower: 'flower',
+  sun: 'sun',
+  truck: 'truck',
+  parcel: 'parcel',
+  bear: 'bear',
+  shop: 'shop',
+  park: 'park',
+  picnic: 'picnic',
+  kid: 'kid',
+  tooth: 'tooth',
+  toothbrush: 'toothbrush',
+  'bug-coral': 'bug',
+};
+
+export function isWordId(id: string): id is WordId {
+  return (WORD_IDS as readonly string[]).includes(id);
+}
+
+export function rollRecent(history: readonly (readonly WordId[])[], deal: readonly WordId[]): WordId[][] {
+  return [...history, [...deal]].slice(-STICKER_RECENT_DEALS);
+}
+
+function pickWords(rand: () => number, count: number, recent: ReadonlySet<WordId>): WordId[] {
+  const fresh = WORD_IDS.filter((id) => !recent.has(id));
+  const reused = WORD_IDS.filter((id) => recent.has(id));
+  if (fresh.length >= count) return shuffle(rand, fresh).slice(0, count);
+  return [...fresh, ...shuffle(rand, reused).slice(0, count - fresh.length)];
+}
+
+export function dealBoard(seed: number, level = 0, recent: readonly WordId[] = []): StickerDeal {
   const rand = mulberry32(seed);
-  const words = shuffle(rand, WORD_IDS).slice(0, stickerWordCount(level));
+  const words = pickWords(rand, stickerWordCount(level), new Set(recent));
   return {
     slots: shuffle(rand, words),
     tray: shuffle(rand, words),
