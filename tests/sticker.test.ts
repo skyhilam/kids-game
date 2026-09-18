@@ -6,12 +6,16 @@ import { sprites } from '../src/art/sprites';
 import { mazeLoadBand, parentCopy, stickerLoadBand, STAGE_LABEL } from '../src/game/stages';
 import { STICKER_COPY } from '../src/sticker/copy';
 import {
+  BASIC_POOL,
   dealBoard,
+  EASY_POOL,
   isCleared,
   lift,
   placedCount,
+  PUZZLE_POOL,
   rollRecent,
   slotOf,
+  STICKER_POOL,
   stickerWordCount,
   tryPlace,
   WORD_EN,
@@ -44,11 +48,30 @@ describe('sticker word list and deal', () => {
     expect(new Set(Object.values(WORD_EN)).size).toBe(WORD_IDS.length);
   });
 
-  it('draws 4/5/6 words from the same pool by load band', () => {
+  it('nests load-band pools as easy ⊂ basic ⊂ puzzle = WORD_IDS', () => {
+    expect(EASY_POOL).toHaveLength(8);
+    expect(BASIC_POOL).toHaveLength(12);
+    expect(PUZZLE_POOL).toHaveLength(16);
+    expect(STICKER_POOL.easy).toEqual(EASY_POOL);
+    expect(STICKER_POOL.basic).toEqual(BASIC_POOL);
+    expect(STICKER_POOL.puzzle).toEqual(PUZZLE_POOL);
+    expect(EASY_POOL.every((id) => BASIC_POOL.includes(id))).toBe(true);
+    expect(BASIC_POOL.every((id) => PUZZLE_POOL.includes(id))).toBe(true);
+    expect(new Set(PUZZLE_POOL)).toEqual(new Set(WORD_IDS));
+    expect([...EASY_POOL]).toEqual(['sun', 'car', 'home', 'tree', 'flower', 'bear', 'kid', 'park']);
+    expect(BASIC_POOL.filter((id) => !EASY_POOL.includes(id))).toEqual(['burger', 'shop', 'truck', 'picnic']);
+    expect(PUZZLE_POOL.filter((id) => !BASIC_POOL.includes(id))).toEqual(['parcel', 'tooth', 'toothbrush', 'bug-coral']);
+    for (const extra of ['car-top', 'truck-top', 'kid-cheer', 'courier', 'bug-purple'] as const) {
+      expect(PUZZLE_POOL).not.toContain(extra);
+    }
+  });
+
+  it('draws 4/5/6 words only from that load-band pool', () => {
     expect(stickerWordCount(0)).toBe(4);
     expect(stickerWordCount(1)).toBe(5);
     expect(stickerWordCount(7)).toBe(5);
     expect(stickerWordCount(8)).toBe(6);
+    expect(stickerWordCount(9)).toBe(6);
 
     const easy = dealBoard(7, 0);
     const basic = dealBoard(7, 1);
@@ -64,38 +87,69 @@ describe('sticker word list and deal', () => {
     expect([...puzzle.slots].sort()).toEqual([...puzzle.tray].sort());
     expect(new Set(easy.slots).size).toBe(4);
     expect(new Set(puzzle.slots).size).toBe(6);
-    expect(easy.slots.every((id) => (WORD_IDS as readonly string[]).includes(id))).toBe(true);
-    expect(puzzle.slots.every((id) => (WORD_IDS as readonly string[]).includes(id))).toBe(true);
+    expect(easy.slots.every((id) => EASY_POOL.includes(id))).toBe(true);
+    expect(basic.slots.every((id) => BASIC_POOL.includes(id))).toBe(true);
+    expect(puzzle.slots.every((id) => PUZZLE_POOL.includes(id))).toBe(true);
     expect(dealBoard(7, 0)).toEqual(easy);
     expect(dealBoard(7)).toEqual(easy);
 
     const seenTray = new Set(Array.from({ length: 24 }, (_, seed) => dealBoard(seed, 8).tray.join(',')));
     expect(seenTray.size).toBeGreaterThan(1);
+
+    const laterTheme = ['burger', 'shop', 'truck', 'picnic', 'parcel', 'tooth', 'toothbrush', 'bug-coral'] as const;
+    const easySeen = new Set(Array.from({ length: 48 }, (_, seed) => dealBoard(seed, 0).slots).flat());
+    expect(laterTheme.every((id) => !easySeen.has(id))).toBe(true);
+
+    const basicSeen = new Set(Array.from({ length: 80 }, (_, seed) => dealBoard(seed, 1).slots).flat());
+    expect(basicSeen.has('burger') || basicSeen.has('shop')).toBe(true);
+    expect((['parcel', 'tooth', 'toothbrush', 'bug-coral'] as const).every((id) => !basicSeen.has(id))).toBe(true);
+
+    const puzzleSeen = new Set(Array.from({ length: 80 }, (_, seed) => dealBoard(seed, 8).slots).flat());
+    expect(puzzleSeen.has('toothbrush')).toBe(true);
+    expect(puzzleSeen.has('bug-coral')).toBe(true);
+    const laterPuzzle = new Set(Array.from({ length: 40 }, (_, seed) => dealBoard(seed, 9).slots).flat());
+    expect(laterPuzzle.has('toothbrush') || laterPuzzle.has('bug-coral')).toBe(true);
   });
 
-  it('avoids recent-level words so five consecutive deals do not recycle one small set', () => {
-    let recent: import('../src/sticker/words').WordId[][] = [];
-    const deals = [0, 1, 2, 3, 4].map((level, index) => {
-      const deal = dealBoard(100 + index * 17, level, recent.flat());
-      expect(deal.slots).toHaveLength(stickerWordCount(level));
-      recent = rollRecent(recent, deal.slots);
-      return deal;
-    });
-
-    for (let i = 1; i < deals.length; i += 1) {
-      const prev = new Set(deals[i - 1]!.slots);
-      expect(deals[i]!.slots.some((id) => prev.has(id))).toBe(false);
-      expect(dealBoard(100 + i * 17, i, deals.slice(Math.max(0, i - 2), i).flatMap((item) => item.slots))).toEqual(deals[i]);
-    }
-
-    const union = new Set(deals.flatMap((deal) => deal.slots));
-    expect(union.size).toBeGreaterThan(6);
-    expect(union.size).toBeGreaterThanOrEqual(12);
-
-    const avoid = ['burger', 'car', 'home', 'tree'] as const;
+  it('prefers unused pool words, then recent-in-pool, and never leaves the band', () => {
+    const avoid = ['car', 'home', 'tree'] as const;
     const next = dealBoard(3, 0, avoid);
     expect(next.slots).toHaveLength(4);
+    expect(next.slots.every((id) => EASY_POOL.includes(id))).toBe(true);
     expect(next.slots.some((id) => (avoid as readonly string[]).includes(id))).toBe(false);
+
+    const recentEasy = EASY_POOL.slice(0, 6);
+    const refill = dealBoard(9, 0, recentEasy);
+    expect(refill.slots).toHaveLength(4);
+    expect(refill.slots.every((id) => EASY_POOL.includes(id))).toBe(true);
+    expect(refill.slots.filter((id) => !recentEasy.includes(id))).toHaveLength(2);
+
+    const forced = dealBoard(5, 0, [...EASY_POOL]);
+    expect(forced.slots).toHaveLength(4);
+    expect(forced.slots.every((id) => EASY_POOL.includes(id))).toBe(true);
+
+    let recent: import('../src/sticker/words').WordId[][] = [];
+    const first = dealBoard(100, 0, recent.flat());
+    recent = rollRecent(recent, first.slots);
+    const second = dealBoard(117, 1, recent.flat());
+    expect(first.slots).toHaveLength(4);
+    expect(second.slots).toHaveLength(5);
+    expect(first.slots.every((id) => EASY_POOL.includes(id))).toBe(true);
+    expect(second.slots.every((id) => BASIC_POOL.includes(id))).toBe(true);
+    expect(second.slots.some((id) => first.slots.includes(id))).toBe(false);
+    expect(dealBoard(117, 1, first.slots)).toEqual(second);
+
+    recent = rollRecent(recent, second.slots);
+    const deals = [first, second];
+    for (let i = 2; i < 5; i += 1) {
+      const deal = dealBoard(100 + i * 17, i, recent.flat());
+      expect(deal.slots).toHaveLength(stickerWordCount(i));
+      expect(deal.slots.every((id) => STICKER_POOL[stickerLoadBand(i)].includes(id))).toBe(true);
+      expect(dealBoard(100 + i * 17, i, recent.flat())).toEqual(deal);
+      recent = rollRecent(recent, deal.slots);
+      deals.push(deal);
+    }
+    expect(new Set(deals.flatMap((deal) => deal.slots)).size).toBeGreaterThan(6);
   });
 });
 
@@ -151,13 +205,32 @@ describe('sticker stages, copy, and hub wiring', () => {
     expect(STAGE_LABEL[stickerLoadBand(3)]).toBe('基礎');
     expect(STAGE_LABEL[stickerLoadBand(9)]).toBe('益智');
     expect(parentCopy.sticker.easy).toEqual({
-      goal: '用 4 張圖練習圖詞配對。',
-      ask: '呢張圖係咩？邊個英文詞？',
-      show: '家長拖一張放對後交返孩子',
+      goal: '用 4 張短詞圖練習圖詞配對，睇圖搵英文詞。',
+      ask: '「呢張圖係咩？邊個英文詞？」',
+      show: '家長拖一張放對並等英文讀出，之後交返孩子自己拖其餘。',
     });
-    expect(parentCopy.sticker.basic.goal).toBe('用 5 張圖練習圖詞配對。');
-    expect(parentCopy.sticker.puzzle.goal).toBe('用 6 張圖練習圖詞配對。');
-    expect(parentCopy.sticker.puzzle.show).toContain('家長拖一張放對後交返孩子');
+    expect(parentCopy.sticker.basic).toEqual({
+      goal: '用 5 張圖練習；可能出現漢堡、商店、貨車等主題詞，仍唔計時唔扣分。',
+      ask: '「呢張圖同邊個英文詞啱？有冇兩個詞睇落好似？」',
+      show: '第一個分岔式混淆（例如兩個都似交通工具）時，家長只指住兩個候選格，唔代拖；等孩子講完再自己放。',
+    });
+    expect(parentCopy.sticker.puzzle).toEqual({
+      goal: '用 6 張圖；可能混入較長詞（例如 toothbrush）或刷牙主題，一次記多幾個配對。',
+      ask: '「出發前你想先配邊張？有冇詞特別長、要慢慢認字母？」',
+      show: '家長示範讀一次長詞（例如 toothbrush），唔代拖完全部；卡住先提示睇托盤剩低邊張。',
+    });
+    const bands = ['easy', 'basic', 'puzzle'] as const;
+    for (let i = 0; i < bands.length; i += 1) {
+      for (let j = i + 1; j < bands.length; j += 1) {
+        const left = parentCopy.sticker[bands[i]!];
+        const right = parentCopy.sticker[bands[j]!];
+        expect(left).not.toEqual(right);
+        expect(left.goal).not.toBe(right.goal);
+        expect(left.ask).not.toBe(right.ask);
+        expect(left.show).not.toBe(right.show);
+        expect(STICKER_COPY.parent[bands[i]!]).not.toBe(STICKER_COPY.parent[bands[j]!]);
+      }
+    }
   });
 
   it('keeps sticker copy free of sticker-book, timer, and score claims', () => {
@@ -171,7 +244,10 @@ describe('sticker stages, copy, and hub wiring', () => {
     expect(STICKER_COPY.winBody).not.toContain('六張');
     expect(STICKER_COPY.task).toContain('圖詞配對練習');
     expect(STICKER_COPY.controls).toContain('可以再拖');
-    expect(STICKER_COPY.parent).toContain('呢張圖係咩？邊個英文詞？');
+    expect(STICKER_COPY.parent.easy).toContain('呢張圖係咩？邊個英文詞？');
+    expect(STICKER_COPY.parent.easy).toContain(parentCopy.sticker.easy.goal);
+    expect(STICKER_COPY.parent.basic).toContain(parentCopy.sticker.basic.ask);
+    expect(STICKER_COPY.parent.puzzle).toContain(parentCopy.sticker.puzzle.show);
   });
 
   it('adds a fourth hub activity without rewriting maze routes', () => {
@@ -186,6 +262,7 @@ describe('sticker stages, copy, and hub wiring', () => {
     expect(app).toContain('StickerPlay');
     expect(play).toContain('stickerLoadBand');
     expect(play).toContain('parentCopy.sticker');
+    expect(play).toContain('copy.parent[stageBand]');
     expect(play).toMatch(/第 \{\{ level \+ 1 \}\} 關/);
     expect(play).toContain(':data-stage="stageLabel"');
     expect(play).toContain('speakEnglish');

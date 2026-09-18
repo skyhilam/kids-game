@@ -58,11 +58,13 @@ describe('generator load bands and parent copy', () => {
     expect(STAGE_PICK_INTRO).toContain('不是年齡分級');
     expect(stickerLoadBand(0)).toBe('easy');
     expect(stickerLoadBand(3)).toBe(mazeLoadBand(3));
-    expect(parentCopy.sticker.easy.goal).toBe('用 4 張圖練習圖詞配對。');
-    expect(parentCopy.sticker.basic.goal).toBe('用 5 張圖練習圖詞配對。');
-    expect(parentCopy.sticker.puzzle.goal).toBe('用 6 張圖練習圖詞配對。');
-    expect(parentCopy.sticker.easy.ask).toContain('呢張圖係咩');
-    expect(parentCopy.sticker.easy.show).toContain('家長拖一張放對後交返孩子');
+    expect(parentCopy.sticker.easy.goal).toBe('用 4 張短詞圖練習圖詞配對，睇圖搵英文詞。');
+    expect(parentCopy.sticker.basic.goal).toBe('用 5 張圖練習；可能出現漢堡、商店、貨車等主題詞，仍唔計時唔扣分。');
+    expect(parentCopy.sticker.puzzle.goal).toBe('用 6 張圖；可能混入較長詞（例如 toothbrush）或刷牙主題，一次記多幾個配對。');
+    expect(parentCopy.sticker.easy.ask).toContain('呢張圖係咩？邊個英文詞？');
+    expect(parentCopy.sticker.easy.show).toContain('家長拖一張放對並等英文讀出');
+    expect(parentCopy.sticker.basic.ask).not.toBe(parentCopy.sticker.easy.ask);
+    expect(parentCopy.sticker.puzzle.show).not.toBe(parentCopy.sticker.basic.show);
     expect(JSON.stringify({ parentCopy, STAGE_PICK_INTRO })).not.toMatch(claims);
   });
 });

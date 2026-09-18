@@ -1,3 +1,10 @@
+import { parentCopy, type LoadBand } from '../game/stages';
+
+function parentLine(band: LoadBand): string {
+  const { goal, ask, show } = parentCopy.sticker[band];
+  return `目標：${goal}提問：${ask}示範：${show}`;
+}
+
 export const STICKER_COPY = {
   title: '貼紙學單字',
   subtitle: '拖貼紙配英文詞，全部放對就過關',
@@ -18,7 +25,11 @@ export const STICKER_COPY = {
   helpTitle: '遊戲說明',
   task: '圖詞配對練習。把貼紙拖到對應的英文詞，全部放對就過關。',
   controls: '從托盤拖貼紙到英文詞格子。放對會貼上並讀出英文；放錯沒有鎖、沒有扣分，可以再拖。放對後仍可拖出來重放。',
-  parent: '目標：圖詞配對練習。提問：呢張圖係咩？邊個英文詞？示範：家長拖一張放對後交返孩子。',
+  parent: {
+    easy: parentLine('easy'),
+    basic: parentLine('basic'),
+    puzzle: parentLine('puzzle'),
+  },
   trayLabel: '貼紙托盤',
   slotsLabel: '英文詞格子',
   footer: ['從容遊玩', '不計時 · 不扣分', '圖詞配對'] as const,

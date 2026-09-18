@@ -402,7 +402,7 @@ onUnmounted(() => {
           </article>
           <article class="parent-col">
             <h4>家長</h4>
-            <p>{{ copy.parent }}</p>
+            <p>{{ copy.parent[stageBand] }}</p>
           </article>
         </div>
         <ParentGuide :guide="guide" :stage-label="stageLabel"/>
