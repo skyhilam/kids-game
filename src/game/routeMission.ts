@@ -1,7 +1,7 @@
 import type { NodeId, Point } from './types';
 import { roadKey } from './graph';
 
-/** Ordered stops are data, so another theme can use the same route rules. */
+/** Ordered stop labels are names on the map; delivery no longer requires that visit order. */
 export interface RouteMission {
   name: string;
   width: number;
@@ -16,16 +16,17 @@ export interface RouteMission {
 export interface RouteState {
   node: NodeId;
   used: Set<string>;
+  done: Set<NodeId>;
   delivered: number;
   won: boolean;
   stalled: boolean;
 }
 
-export type RouteFailure = 'blocked' | 'not-adjacent' | 'used-road' | 'wrong-order' | 'unfinished';
+export type RouteFailure = 'blocked' | 'not-adjacent' | 'unfinished';
 export type RouteResult = { ok: true } | { ok: false; reason: RouteFailure };
 
 export function createRouteState(mission: RouteMission): RouteState {
-  return { node: mission.start, used: new Set(), delivered: 0, won: false, stalled: false };
+  return { node: mission.start, used: new Set(), done: new Set(), delivered: 0, won: false, stalled: false };
 }
 
 export function routeNeighbors(mission: RouteMission, node: NodeId): NodeId[] {
@@ -35,10 +36,7 @@ export function routeNeighbors(mission: RouteMission, node: NodeId): NodeId[] {
 export function checkRouteMove(mission: RouteMission, state: RouteState, to: NodeId): RouteResult {
   if (state.won || state.stalled) return { ok: false, reason: 'blocked' };
   if (!routeNeighbors(mission, state.node).includes(to)) return { ok: false, reason: 'not-adjacent' };
-  if (state.used.has(roadKey(state.node, to))) return { ok: false, reason: 'used-road' };
-  const stop = mission.stops.findIndex((item) => item.node === to);
-  if (stop > state.delivered) return { ok: false, reason: 'wrong-order' };
-  if (to === mission.finish && state.delivered !== mission.stops.length) return { ok: false, reason: 'unfinished' };
+  if (to === mission.finish && state.done.size !== mission.stops.length) return { ok: false, reason: 'unfinished' };
   return { ok: true };
 }
 
@@ -47,32 +45,37 @@ export function moveOnRoute(mission: RouteMission, state: RouteState, to: NodeId
   if (!result.ok) return result;
   state.used.add(roadKey(state.node, to));
   state.node = to;
-  if (mission.stops[state.delivered]?.node === to) state.delivered += 1;
-  state.won = to === mission.finish && state.delivered === mission.stops.length;
-  state.stalled = !state.won && isRouteDeadend(mission, state);
+  if (mission.stops.some((stop) => stop.node === to)) state.done.add(to);
+  state.delivered = state.done.size;
+  state.won = to === mission.finish && state.done.size === mission.stops.length;
+  state.stalled = false;
   return result;
 }
 
-function isRouteDeadend(mission: RouteMission, state: RouteState): boolean {
-  return routeNeighbors(mission, state.node).every((to) => state.used.has(roadKey(state.node, to)));
+function clonePlay(state: RouteState): RouteState {
+  return {
+    ...state,
+    used: new Set(state.used),
+    done: new Set(state.done),
+  };
 }
 
-/** Search uses the same transitions as play. Arrival at the next house delivers. */
+/** Shortest hop path to deliver remaining houses, then finish. Roads may be reused. */
 export function findRouteSolution(mission: RouteMission, state: RouteState): NodeId[] | null {
-  const failed = new Set<string>();
-  function search(current: RouteState): NodeId[] | null {
-    if (current.won) return [];
-    if (current.stalled) return null;
-    const key = `${current.node}/${current.delivered}/${[...current.used].sort().join(',')}`;
-    if (failed.has(key)) return null;
-    for (const to of routeNeighbors(mission, current.node)) {
-      const next = { ...current, used: new Set(current.used) };
+  if (state.won) return [];
+  const seen = new Set<string>();
+  const queue: { play: RouteState; path: NodeId[] }[] = [{ play: clonePlay(state), path: [] }];
+  while (queue.length) {
+    const { play, path } = queue.shift()!;
+    const key = `${play.node}/${[...play.done].sort().join(',')}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (play.won) return path;
+    for (const to of routeNeighbors(mission, play.node)) {
+      const next = clonePlay(play);
       if (!moveOnRoute(mission, next, to).ok) continue;
-      const rest = search(next);
-      if (rest) return [to, ...rest];
+      queue.push({ play: next, path: [...path, to] });
     }
-    failed.add(key);
-    return null;
   }
-  return search({ ...state, used: new Set(state.used) });
+  return null;
 }

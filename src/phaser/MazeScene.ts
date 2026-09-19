@@ -4,12 +4,16 @@ import { carPose } from '../game/motion';
 import { picnicCollect } from '../picnic/board';
 import { SHOP_ART, shopArtOrigin } from '../picnic/art';
 import { EventBus } from './EventBus';
+import { syncBoardCanvas } from './display';
 import { drawMazeRoads, drawMazeTrails, drawPicnicScenery, drawToothScenery } from './draw';
 import type { BoardModel, MazeBoardModel } from './models';
 import {
-  BOARD_FONT,
+    BOARD_FONT,
   addBoardSprite,
   atlasKey,
+  layoutBoardSprite,
+  layoutBoardLabel,
+  paintLabelChip,
   currentAction,
   preloadBoardAtlases,
   registerAtlasFrames,
@@ -42,27 +46,27 @@ export class MazeScene extends Phaser.Scene {
     const model = this.read();
     registerAtlasFrames(this, model.theme === 'tooth' ? TOOTH_SPRITES : PICNIC_SPRITES);
     this.cameras.main.setBackgroundColor(model.theme === 'tooth' ? '#e7f2ee' : '#e4edd4');
-    this.scenery = this.add.graphics().setDepth(0);
-    this.roads = this.add.graphics().setDepth(1);
-    this.trails = this.add.graphics().setDepth(2);
-    this.marks = this.add.graphics().setDepth(3);
-    this.parts = this.add.container(0, 0).setDepth(4);
-    this.player = this.add.sprite(0, 0, atlasKey(model.theme === 'tooth' ? 'kid' : 'car-top'), model.theme === 'tooth' ? 'kid' : 'car-top').setDepth(5);
-    this.cargo = this.add.sprite(0, 0, atlasKey('burger'), 'burger').setDepth(6);
+    this.world = this.add.container(0, 0);
+    this.scenery = this.add.graphics();
+    this.roads = this.add.graphics();
+    this.trails = this.add.graphics();
+    this.marks = this.add.graphics();
+    this.parts = this.add.container(0, 0);
+    this.player = this.add.sprite(0, 0, atlasKey(model.theme === 'tooth' ? 'kid' : 'car-top'), model.theme === 'tooth' ? 'kid' : 'car-top');
+    this.cargo = this.add.sprite(0, 0, atlasKey('burger'), 'burger');
     this.pickup = this.add.text(0, 0, '已購得漢堡  ✓', {
-      fontFamily: BOARD_FONT, fontSize: '14px', color: '#304b43', backgroundColor: '#fffdf8',
-      padding: { x: 12, y: 8 },
-    }).setOrigin(0.5, 1).setDepth(7).setVisible(false);
+      fontFamily: BOARD_FONT, fontSize: '14px', color: '#304b43', fontStyle: 'bold',
+    }).setOrigin(0.5, 1).setVisible(false);
+    this.world.add([this.scenery, this.roads, this.trails, this.marks, this.parts, this.player, this.cargo, this.pickup]);
+    this.fitWorld(model);
     this.drawBackdrop(model);
     EventBus.emit('current-scene-ready', this);
   }
 
   update(time: number): void {
     const model = this.read();
-    if (model.width !== this.scale.width || model.height !== this.scale.height) {
-      this.scale.resize(model.width, model.height);
-      this.drawBackdrop(model);
-    }
+    this.advanceFlight(model, time);
+    if (this.fitWorld(model)) this.drawBackdrop(model);
     drawMazeRoads(this.roads, model.graph, model.theme === 'tooth' ? { ...model.roads, center: '#c9ddd5' } : model.roads);
     drawMazeTrails(this.trails, model.graph, model.state, model.inFlight);
     this.syncLandmarks(model, time);
@@ -71,6 +75,7 @@ export class MazeScene extends Phaser.Scene {
     this.publish(model);
   }
 
+  private world!: Phaser.GameObjects.Container;
   private scenery!: Phaser.GameObjects.Graphics;
   private roads!: Phaser.GameObjects.Graphics;
   private trails!: Phaser.GameObjects.Graphics;
@@ -81,11 +86,42 @@ export class MazeScene extends Phaser.Scene {
   private pickup!: Phaser.GameObjects.Text;
   private art = new Map<string, Phaser.GameObjects.Sprite>();
   private labels = new Map<string, Phaser.GameObjects.Text>();
+  private zoom = 1;
   private seenCollect = false;
   private pickupUntil = 0;
+  private flight: MazeBoardModel['inFlight'] = null;
+  private flightAt = 0;
+  private flightDone = false;
 
   private read(): MazeBoardModel {
     return this.registry.get('readModel')() as MazeBoardModel;
+  }
+
+  private fitWorld(model: MazeBoardModel): boolean {
+    const { resized, scale } = syncBoardCanvas(this, model);
+    this.world.setScale(scale.x, scale.y);
+    this.zoom = scale.x;
+    return resized;
+  }
+
+  /** Phaser owns in-flight interpolation so arrival does not depend on Vue rAF. */
+  private advanceFlight(model: MazeBoardModel, time: number): void {
+    const flight = model.inFlight;
+    if (!flight) {
+      this.flight = null;
+      this.flightDone = false;
+      return;
+    }
+    if (this.flight !== flight) {
+      this.flight = flight;
+      this.flightAt = time - flight.t * flight.duration;
+      this.flightDone = false;
+    }
+    flight.t = Math.min(1, (time - this.flightAt) / Math.max(1, flight.duration));
+    if (flight.t >= 1 && !this.flightDone) {
+      this.flightDone = true;
+      EventBus.emit('flight-complete');
+    }
   }
 
   private drawBackdrop(model: MazeBoardModel): void {
@@ -101,9 +137,7 @@ export class MazeScene extends Phaser.Scene {
       this.art.set(id, sprite);
     } else {
       sprite.setTexture(atlasKey(name), name);
-      sprite.setPosition(x, y);
-      sprite.setDisplaySize(width, height);
-      sprite.setOrigin(origin.x, origin.y);
+      layoutBoardSprite(sprite, x, y, width, height, origin);
     }
     sprite.setVisible(true);
     return sprite;
@@ -112,16 +146,12 @@ export class MazeScene extends Phaser.Scene {
   private label(id: string, x: number, y: number, text: string, fill: string, stroke: string, color: string): void {
     let item = this.labels.get(id);
     if (!item) {
-      item = this.add.text(x, y, text, {
-        fontFamily: BOARD_FONT, fontSize: '12px', color, fontStyle: 'bold',
-        backgroundColor: fill, padding: { x: 10, y: 5 },
-      }).setOrigin(0.5);
-      item.setStroke(stroke, 1);
+      item = this.add.text(x, y, text, { fontFamily: BOARD_FONT, fontSize: '12px', color, fontStyle: 'bold' }).setOrigin(0.5);
       this.parts.add(item);
       this.labels.set(id, item);
-    } else {
-      item.setPosition(x, y).setText(text).setColor(color).setBackgroundColor(fill);
     }
+    layoutBoardLabel(item, x, y, text, color, 12, this.zoom);
+    paintLabelChip(this.marks, item, fill, stroke);
     item.setVisible(true);
   }
 
@@ -205,15 +235,19 @@ export class MazeScene extends Phaser.Scene {
   }
 
   private toothMarks(model: MazeBoardModel, time: number, keep: Set<string>): void {
-    const { graph, state, inFlight } = model;
+    const { graph } = model;
     const start = graph.nodes[graph.start];
     const goal = graph.nodes[graph.goal];
     this.marks.fillStyle(rgb('#bdddd2'), 1);
-    this.marks.fillEllipse(start[0], start[1] + 8, 72, 24);
+    this.marks.fillEllipse(start[0], start[1] + 6, 54, 16);
+    this.marks.lineStyle(1.5, rgb('#9cc9b8'), 1);
+    this.marks.strokeEllipse(start[0], start[1] + 6, 54, 16);
     this.label('start-title', start[0] + 56, start[1] + 6, graph.titles[graph.start], '#e8f4ff', '#b7cde0', '#4d7a9a');
     keep.add('start-title');
     this.marks.fillStyle(rgb('#cde3ce'), 1);
-    this.marks.fillEllipse(goal[0], goal[1] + 8, 76, 24);
+    this.marks.fillEllipse(goal[0], goal[1] + 6, 54, 16);
+    this.marks.lineStyle(1.5, rgb('#a8c9b0'), 1);
+    this.marks.strokeEllipse(goal[0], goal[1] + 6, 54, 16);
     const glow = model.reduceMotion ? 1 : 0.65 + Math.sin(time / 480) * 0.35;
     keep.add('tooth');
     this.sprite('tooth', 'tooth', goal[0] - 51, goal[1] - 125, 102, 96).setAlpha(0.75 + glow * 0.25);
@@ -223,16 +257,13 @@ export class MazeScene extends Phaser.Scene {
     keep.add('brush-b');
     this.sprite('brush-a', 'toothbrush', 38 / 840 * model.width, 39 / 660 * model.height, 36, 72).setAlpha(0.72);
     this.sprite('brush-b', 'toothbrush', 762 / 840 * model.width, 530 / 660 * model.height, 32, 68).setAlpha(0.65);
-    const links = inFlight ? [] : (graph.adj[state.node] ?? []).filter((link) => !state.used.has(link.edge.id));
-    const shown = new Set(links.map((link) => link.to));
     graph.hazards.forEach((id, index) => {
-      if (shown.has(id)) return;
       const [x, y] = graph.nodes[id];
-      this.marks.fillStyle(rgb('#b7858d'), 0.18);
-      this.marks.fillEllipse(x, y + 17, 62, 20);
+      this.marks.fillStyle(rgb('#b7858d'), 0.16);
+      this.marks.fillEllipse(x, y + 10, 46, 14);
       const key = `bug-${id}`;
       keep.add(key);
-      const bug = this.sprite(key, bugName(index), x - 42, y - 55, 84, 84);
+      const bug = this.sprite(key, bugName(index), x, y, 78, 78, { x: 0.5, y: 0.84 });
       bug.setAngle(model.reduceMotion ? 0 : Math.sin(time / 420 + index) * 5);
     });
   }
@@ -243,26 +274,24 @@ export class MazeScene extends Phaser.Scene {
     if (model.theme === 'tooth') {
       const name: SpriteName = model.state.won ? 'kid-cheer' : 'kid';
       syncBoardSprite(this, this.player, name, action, { reduceMotion: model.reduceMotion, origin: { x: 0.5, y: 0.83 } });
-      this.player.setDisplaySize(86, 110);
+      layoutBoardSprite(this.player, pose.x, pose.y, 86, 110, { x: 0.5, y: 0.83 });
       this.player.setFlipX(facingLeft(pose.angle));
       const bob = !model.reduceMotion && model.inFlight ? Math.sin(time / 80) * 5 : 0;
       this.player.setPosition(pose.x, pose.y + bob);
       this.player.setAngle(model.reduceMotion || !model.inFlight ? 0 : Math.sin(time / 80) * 2);
       this.cargo.setVisible(false);
-      this.marks.fillStyle(rgb('#446f5b'), 0.15);
-      this.marks.fillEllipse(pose.x, pose.y + 15, 50, 16);
+      this.marks.fillStyle(rgb('#446f5b'), 0.12);
+      this.marks.fillEllipse(pose.x, pose.y + 12, 36, 10);
       return;
     }
     syncBoardSprite(this, this.player, 'car-top', action, { reduceMotion: model.reduceMotion, origin: { x: 0.5, y: 0.5 } });
-    this.player.setDisplaySize(100, 66);
+    layoutBoardSprite(this.player, pose.x, pose.y, 100, 66, { x: 0.5, y: 0.5 });
     this.player.setFlipX(false);
-    this.player.setPosition(pose.x, pose.y);
     this.player.setAngle(pose.angle);
     this.cargo.setVisible(model.state.collected);
     if (model.state.collected) {
       this.cargo.setTexture(atlasKey('burger'), 'burger');
-      this.cargo.setDisplaySize(29, 29);
-      this.cargo.setPosition(pose.x - 29, pose.y - 28);
+      layoutBoardSprite(this.cargo, pose.x - 29, pose.y - 28, 29, 29);
       this.cargo.setAngle(pose.angle);
     }
   }
@@ -279,6 +308,10 @@ export class MazeScene extends Phaser.Scene {
     }
     this.seenCollect = model.state.collected;
     if (this.time.now > this.pickupUntil) this.pickup.setVisible(false);
+    if (this.pickup.visible) {
+      layoutBoardLabel(this.pickup, this.pickup.x, this.pickup.y, '已購得漢堡  ✓', '#304b43', 14, this.zoom);
+      paintLabelChip(this.marks, this.pickup, '#fffdf8', '#e2e6d7');
+    }
   }
 
   private publish(model: MazeBoardModel): void {

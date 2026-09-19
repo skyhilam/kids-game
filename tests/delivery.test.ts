@@ -6,6 +6,7 @@ import { deliveryMission, generateDeliveryMission } from '../src/delivery/genera
 import { DELIVERY_MISSION } from '../src/delivery/mission';
 import { roadKey } from '../src/game/graph';
 import { checkRouteMove, createRouteState, findRouteSolution, moveOnRoute, type RouteMission, type RouteState } from '../src/game/routeMission';
+import { clearOfRoads, deliveryFlowers, deliveryTrees, distToSegment } from '../src/delivery/scenery';
 import { followRouteStroke, junctionSlack, projectToRoad, traceAlongRoad } from '../src/game/trace';
 import type { Point } from '../src/game/types';
 
@@ -63,7 +64,7 @@ function houseAbove(mission: RouteMission, node: string): boolean {
 }
 
 describe('delivery mission', () => {
-  it('completes the photographed rules: 1 → 2 → 3 on arrival, then finish, without reusing roads', () => {
+  it('delivers any house on arrival, then finish, and may reuse roads', () => {
     const state = createRouteState(DELIVERY_MISSION);
     const arrivals: string[] = [];
     for (const node of route) {
@@ -73,21 +74,26 @@ describe('delivery mission', () => {
     }
     expect(arrivals).toEqual(['house1', 'house2', 'house3']);
     expect(state.delivered).toBe(3);
+    expect(state.done).toEqual(new Set(['house1', 'house2', 'house3']));
     expect(state.used.size).toBe(route.length);
     expect(state.won).toBe(true);
     expect(moveOnRoute(DELIVERY_MISSION, state, 'j')).toEqual({ ok: false, reason: 'blocked' });
   });
 
-  it('blocks a future house without consuming the road or changing progress', () => {
+  it('can deliver a nearer house first and still reverse along a used road', () => {
     const state = createRouteState(DELIVERY_MISSION);
     for (const node of ['a', 'b']) moveOnRoute(DELIVERY_MISSION, state, node);
-    expect(moveOnRoute(DELIVERY_MISSION, state, 'house2')).toEqual({ ok: false, reason: 'wrong-order' });
+    expect(moveOnRoute(DELIVERY_MISSION, state, 'house2')).toEqual({ ok: true });
+    expect(state.node).toBe('house2');
+    expect(state.delivered).toBe(1);
+    expect(state.done.has('house2')).toBe(true);
+    expect(state.used.has(roadKey('b', 'house2'))).toBe(true);
+    expect(checkRouteMove(DELIVERY_MISSION, state, 'b')).toEqual({ ok: true });
+    expect(moveOnRoute(DELIVERY_MISSION, state, 'b').ok).toBe(true);
     expect(state.node).toBe('b');
-    expect(state.delivered).toBe(0);
-    expect(state.used.has(roadKey('b', 'house2'))).toBe(false);
   });
 
-  it('delivers on arrival at the next house and can leave immediately', () => {
+  it('delivers on arrival at a house and can leave immediately', () => {
     const state = createRouteState(DELIVERY_MISSION);
     for (const node of route.slice(0, 5)) moveOnRoute(DELIVERY_MISSION, state, node);
     expect(state.node).toBe('house1');
@@ -95,18 +101,7 @@ describe('delivery mission', () => {
     expect(moveOnRoute(DELIVERY_MISSION, state, 'd').ok).toBe(true);
   });
 
-  it('rejects reverse traversal but permits returning to a junction on different roads', () => {
-    const state = createRouteState(DELIVERY_MISSION);
-    moveOnRoute(DELIVERY_MISSION, state, 'a');
-    expect(checkRouteMove(DELIVERY_MISSION, state, 'start')).toEqual({ ok: false, reason: 'used-road' });
-    const other = createRouteState(DELIVERY_MISSION);
-    for (const node of route.slice(0, 11)) {
-      expect(moveOnRoute(DELIVERY_MISSION, other, node).ok).toBe(true);
-    }
-    expect(other.node).toBe('e'); // Second visit to e is legal.
-  });
-
-  it('does not finish early and handles real dead ends', () => {
+  it('does not finish early, and a dead-end is still reversible', () => {
     const mission: RouteMission = { name: 'test', width: 100, height: 100, start: 's', finish: 'f',
       stops: [{ node: 'h', label: 'house' }], nodes: { s: [0, 0], f: [100, 0], h: [0, 100], dead: [50, 50] },
       edges: [['s', 'f'], ['s', 'h'], ['s', 'dead']] };
@@ -114,18 +109,19 @@ describe('delivery mission', () => {
     expect(moveOnRoute(mission, state, 'f')).toEqual({ ok: false, reason: 'unfinished' });
     expect(state.won).toBe(false);
     moveOnRoute(mission, state, 'dead');
-    expect(state.stalled).toBe(true);
-    expect(findRouteSolution(mission, state)).toBeNull();
+    expect(state.stalled).toBe(false);
+    expect(moveOnRoute(mission, state, 's').ok).toBe(true);
+    expect(findRouteSolution(mission, state)).not.toBeNull();
   });
 
   it('offers a valid continuation at every point without mutating play', () => {
     const state = createRouteState(DELIVERY_MISSION);
     for (const node of route) {
-      const before = { ...state, used: new Set(state.used) };
+      const before = { ...state, used: new Set(state.used), done: new Set(state.done) };
       const path = findRouteSolution(DELIVERY_MISSION, state);
       expect(state).toEqual(before);
       expect(path).not.toBeNull();
-      const preview = { ...state, used: new Set(state.used) };
+      const preview = { ...state, used: new Set(state.used), done: new Set(state.done) };
       for (const next of path!) {
         expect(moveOnRoute(DELIVERY_MISSION, preview, next).ok).toBe(true);
       }
@@ -134,15 +130,17 @@ describe('delivery mission', () => {
     }
   });
 
-  it('reports an unsolvable detour and resets all parcels and ink', () => {
+  it('can still finish after a detour that used to trap the Euler path', () => {
     const state = createRouteState(DELIVERY_MISSION);
-    // This uses the road needed to leave house 1 before reaching it.
     for (const node of ['a', 'b', 'd', 'house1']) moveOnRoute(DELIVERY_MISSION, state, node);
     expect(state.delivered).toBe(1);
-    expect(findRouteSolution(DELIVERY_MISSION, state)).toBeNull();
+    const path = findRouteSolution(DELIVERY_MISSION, state);
+    expect(path).not.toBeNull();
+    expect(path?.at(-1)).toBe('finish');
     const fresh = createRouteState(DELIVERY_MISSION);
     expect(fresh.delivered).toBe(0);
     expect(fresh.used.size).toBe(0);
+    expect(fresh.done.size).toBe(0);
   });
 });
 
@@ -155,24 +153,14 @@ describe('random delivery maps', () => {
     expect(playableGraph(generateDeliveryMission(1))).not.toEqual(playableGraph(DELIVERY_MISSION));
   });
 
-  it('reorders the three houses when the farthest-first visit has no route', () => {
+  it('keeps farthest-first house labels and still has a finish solution', () => {
     const mission = generateDeliveryMission(0);
-    expect(geometricOrder(mission)).toEqual(['house1', 'house3', 'house2']);
-    const geometric: RouteMission = {
-      ...mission,
-      stops: [
-        { node: 'house1', label: '1 號屋' },
-        { node: 'house3', label: '3 號屋' },
-        { node: 'house2', label: '2 號屋' },
-      ],
-    };
-    expect(findRouteSolution(geometric, createRouteState(geometric))).toBeNull();
+    expect(geometricOrder(mission)).toEqual(['house1', 'house2', 'house3']);
     const path = findRouteSolution(mission, createRouteState(mission));
     expect(path).not.toBeNull();
-    const first = (id: string) => path!.indexOf(id);
-    expect(first('house1')).toBeGreaterThanOrEqual(0);
-    expect(first('house2')).toBeGreaterThan(first('house1'));
-    expect(first('house3')).toBeGreaterThan(first('house2'));
+    for (const id of ['house1', 'house2', 'house3']) {
+      expect(path, id).toContain(id);
+    }
     expect(path?.at(-1)).toBe('finish');
   });
 
@@ -183,7 +171,7 @@ describe('random delivery maps', () => {
     expect(houseAbove(generateDeliveryMission(0), 'house1')).toBe(true);
   });
 
-  it('always has three spaced houses and a 1 → 2 → 3 → finish solution', () => {
+  it('always has three spaced houses and a path that visits every house then finish', () => {
     expect(Object.keys(generateDeliveryMission(2).nodes)).toHaveLength(9);
     expect(generateDeliveryMission(2).edges.length).toBeLessThan(12);
     expect(Object.keys(generateDeliveryMission(0).nodes)).toHaveLength(12);
@@ -207,11 +195,9 @@ describe('random delivery maps', () => {
       const path = findRouteSolution(mission, createRouteState(mission));
       expect(path, `seed ${seed}`).not.toBeNull();
       expect(path?.at(-1), `seed ${seed}`).toBe('finish');
-      const first = (id: string) => path!.indexOf(id);
-      expect(first('house1'), `seed ${seed}`).toBeGreaterThanOrEqual(0);
-      expect(first('house2'), `seed ${seed}`).toBeGreaterThan(first('house1'));
-      expect(first('house3'), `seed ${seed}`).toBeGreaterThan(first('house2'));
-      expect(first('finish'), `seed ${seed}`).toBeGreaterThan(first('house3'));
+      for (const id of houseNodes) {
+        expect(path, `seed ${seed} ${id}`).toContain(id);
+      }
     }
   });
 });
@@ -395,7 +381,7 @@ describe('corner tracing', () => {
     expect(state.used.has(roadKey('b', 'n'))).toBe(false);
   });
 
-  it('keeps one-use roads and house order when a stroke arrives at a junction', () => {
+  it('keeps drawing into any adjacent road after a stroke arrives at a junction', () => {
     const state = createRouteState(DELIVERY_MISSION);
     const start = DELIVERY_MISSION.nodes.start;
     const a = DELIVERY_MISSION.nodes.a;
@@ -409,8 +395,9 @@ describe('corner tracing', () => {
     expect(state.used.has(roadKey('start', 'a'))).toBe(true);
     expect(state.used.size).toBe(1);
     expect(moveOnRoute(DELIVERY_MISSION, state, 'b').ok).toBe(true);
-    expect(moveOnRoute(DELIVERY_MISSION, state, 'house2')).toEqual({ ok: false, reason: 'wrong-order' });
-    expect(state.delivered).toBe(0);
+    expect(moveOnRoute(DELIVERY_MISSION, state, 'house2')).toEqual({ ok: true });
+    expect(state.delivered).toBe(1);
+    expect(state.done.has('house2')).toBe(true);
   });
 });
 
@@ -429,5 +416,21 @@ describe('delivery tap mode', () => {
     expect(html).toContain('選擇下一個路口');
     expect(html).toContain('delivery-target');
     expect(html).not.toContain('class="delivery-board tracing"');
+  });
+});
+
+describe('delivery scenery placement', () => {
+  it('keeps trees and flowers off generated roads and junctions', () => {
+    for (const seed of [1, 2, 7, 11, 19, 42, 91]) {
+      const mission = generateDeliveryMission(seed);
+      for (const [x, y] of deliveryTrees(mission)) {
+        expect(clearOfRoads(mission, x, y), `tree seed ${seed} at ${x},${y}`).toBe(true);
+      }
+      for (const [x, y] of deliveryFlowers(mission)) {
+        expect(clearOfRoads(mission, x + 23, y + 20), `flower seed ${seed} at ${x},${y}`).toBe(true);
+      }
+    }
+    expect(distToSegment(0, 10, [0, 0], [100, 0])).toBe(10);
+    expect(distToSegment(50, 0, [0, 0], [100, 0])).toBe(0);
   });
 });

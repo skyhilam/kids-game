@@ -18,6 +18,7 @@ import {
 import { easeInOut } from '../game/motion';
 import { traveledEnds } from '../game/trail';
 import type { GameState, Graph, InFlightMove, NodeId, Point } from '../game/types';
+import type { RouteMission } from '../game/routeMission';
 import { rgb } from './textures';
 
 type G = Phaser.GameObjects.Graphics;
@@ -164,4 +165,15 @@ export function drawDeliveryScenery(g: G, width: number, height: number): void {
   g.fillEllipse(width * 0.76, height * 0.79, width * 0.38, height * 0.32);
   g.fillStyle(rgb('#dfe9d0'), 1);
   g.fillEllipse(width * 0.27, height * 0.36, width * 0.2, height * 0.18);
+}
+
+export const DELIVERY_ROAD_BORDER = 48;
+export const DELIVERY_ROAD_FILL = 39;
+
+export function drawDeliveryNetwork(g: G, mission: RouteMission): void {
+  const points = Object.values(mission.nodes);
+  for (const [a, b] of mission.edges) strokeLine(g, DELIVERY_ROAD_BORDER, '#ced8bf', mission.nodes[a], mission.nodes[b]);
+  fillDots(g, '#ced8bf', DELIVERY_ROAD_BORDER / 2, points);
+  for (const [a, b] of mission.edges) strokeLine(g, DELIVERY_ROAD_FILL, '#fffdf5', mission.nodes[a], mission.nodes[b]);
+  fillDots(g, '#fffdf5', DELIVERY_ROAD_FILL / 2, points);
 }

@@ -208,7 +208,7 @@ async function runActivities(page) {
   if (await page.locator('.step-target').count() < 1) throw new Error('no tooth move targets after start');
   await goHome(page);
 
-  await page.getByRole('button', { name: '送貨員來了 畫線送到 1、2、3 號屋，再到終點。' }).click();
+  await page.getByRole('button', { name: '送貨員來了 送到三間屋，再到終點。' }).click();
   await page.getByRole('button', { name: '開始送貨' }).waitFor();
   const deliverySprites = await spriteNames(page);
   for (const name of ['truck', 'truck-top', 'home']) {
@@ -225,7 +225,7 @@ async function runActivities(page) {
   await page.screenshot({ path: join(outDir, 'delivery-generated.png'), fullPage: true });
   log('desktop delivery: first house auto-delivered, no stamp button');
   await goHome(page);
-  await page.getByRole('button', { name: '送貨員來了 畫線送到 1、2、3 號屋，再到終點。' }).click();
+  await page.getByRole('button', { name: '送貨員來了 送到三間屋，再到終點。' }).click();
   await page.getByRole('button', { name: '開始送貨' }).click();
   await page.waitForFunction(() => !document.querySelector('dialog')?.open);
   const deliverySecond = await deliveryFingerprint(page);

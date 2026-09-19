@@ -1,6 +1,6 @@
 import type { RouteMission } from '../game/routeMission';
 
-/** Original map: the photo supplies the task, order and one-use-road rule. */
+/** Original map: three houses and a finish. Visit any house, then the blue end. */
 export const DELIVERY_MISSION: RouteMission = {
   name: '送貨員來了',
   width: 840,

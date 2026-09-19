@@ -64,12 +64,15 @@ describe('shared play cues', () => {
     const delivery = readFileSync(join(root, 'src/components/DeliveryPlay.vue'), 'utf8');
     const mazePlay = readFileSync(join(root, 'src/components/MazePlay.vue'), 'utf8');
 
-    for (const source of [maze, delivery]) {
-      expect(source).toContain("playCue(soundOn.value, 'move')");
-      expect(source).toContain("playCue(soundOn.value, 'win')");
-      expect(source).toContain("playCue(soundOn.value, 'fail')");
-      expect(source).toContain('usePlayAudio');
-    }
+    expect(maze).toContain("playCue(soundOn.value, 'move')");
+    expect(maze).toContain("playCue(soundOn.value, 'win')");
+    expect(maze).toContain("playCue(soundOn.value, 'fail')");
+    expect(maze).toContain('usePlayAudio');
+    expect(delivery).toContain("playCue(soundOn.value, 'move')");
+    expect(delivery).toContain("playCue(soundOn.value, 'win')");
+    expect(delivery).toContain("playCue(soundOn.value, 'collect')");
+    expect(delivery).toContain('usePlayAudio');
+    expect(delivery).not.toContain("playCue(soundOn.value, 'fail')");
 
     expect(mazePlay).toContain("soundOn ? '關閉音效' : '開啟音效'");
     expect(delivery).toContain("soundOn ? '關閉音效' : '開啟音效'");

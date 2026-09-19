@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGameSession } from '../src/composables/useGameSession';
+import { EventBus } from '../src/phaser/EventBus';
 import { ARRIVAL_GUIDE, HINT_GUIDE, hintGuide, sessionCopy as picnicCopy } from '../src/picnic/copy';
 import {
   ARRIVAL_GUIDE as TOOTH_ARRIVAL,
@@ -207,6 +208,20 @@ describe('game session (two-axis overlay)', () => {
     expect(session.inFlight.value).toBeNull();
     expect(session.interactive.value).toBe(true);
     expect(session.overlay.value).toBeNull();
+  });
+
+  it('settles when Phaser emits flight-complete without Vue frames', () => {
+    const session = picnicSession();
+    session.welcomeStart();
+    expect(session.requestMove('a').ok).toBe(true);
+    expect(session.inFlight.value).not.toBeNull();
+    session.inFlight.value!.t = 1;
+    EventBus.emit('flight-complete');
+    expect(session.game.node).toBe('a');
+    expect(session.inFlight.value).toBeNull();
+    expect(session.interactive.value).toBe(true);
+    flushFrames();
+    expect(session.game.node).toBe('a');
   });
 
   it('no-ops restart once the win overlay is on', () => {
@@ -541,7 +556,8 @@ describe('dialog wiring', () => {
     expect(sessionSrc).not.toMatch(/arrivalKind/);
     expect(sessionSrc).toMatch(/copy\.arrivalGuide\(/);
     expect(sessionSrc).toMatch(/copy\.hintGuide\(/);
-    expect(sessionSrc).toMatch(/onUnmounted\(\(\) => \{\s*epoch\.value \+= 1/);
+    expect(sessionSrc).toMatch(/EventBus\.on\('flight-complete'/);
+    expect(sessionSrc).toMatch(/onUnmounted\(\(\) => \{[\s\S]*epoch\.value \+= 1/);
 
     const typesSrc = readFileSync(join(root, 'src/game/types.ts'), 'utf8');
     expect(typesSrc).not.toMatch(/export type Motion/);

@@ -3,7 +3,6 @@ import { computed, nextTick, ref, watch } from 'vue';
 import PhaserGame from '../phaser/PhaserGame.vue';
 import type { DeliveryBoardModel } from '../phaser/models';
 import { useRouteTrace } from '../composables/useRouteTrace';
-import { roadKey } from '../game/graph';
 import { routeNeighbors, type RouteFailure, type RouteMission, type RouteState } from '../game/routeMission';
 import { heading } from '../game/motion';
 import { bestByVector } from '../game/input';
@@ -30,8 +29,7 @@ const { trace, position, onPointerDown, onPointerMove, onPointerUp, stopPointer 
   enabled: () => props.enabled && props.mode === 'trace',
   move: (to) => emit('move', to), feedback: (reason) => emit('feedback', reason),
 });
-const neighbors = computed(() => routeNeighbors(props.mission, props.state.node)
-  .filter((to) => !props.state.used.has(roadKey(props.state.node, to))));
+const neighbors = computed(() => routeNeighbors(props.mission, props.state.node));
 const angle = computed(() => trace.value ? heading(props.mission.nodes[props.state.node], props.mission.nodes[trace.value.to]) : facing.value);
 watch(() => props.state.node, (to, from) => { facing.value = heading(props.mission.nodes[from], props.mission.nodes[to]); });
 watch(() => trace.value?.to ?? null, (to) => emit('tracing', to), { immediate: true });
@@ -115,7 +113,7 @@ watch([() => props.state.node, () => props.enabled], async () => {
           <svg viewBox="0 0 32 32" aria-hidden="true" :style="{ rotate: `${heading(mission.nodes[state.node], mission.nodes[node])}deg` }"><use href="#i-arrow"/></svg>
         </button>
       </div>
-      <div class="delivery-map-note">同一路段只走一次</div>
+      <div class="delivery-map-note">送到三間屋，再到終點</div>
     </div>
   </section>
 </template>

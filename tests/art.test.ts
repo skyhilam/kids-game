@@ -121,4 +121,23 @@ describe('shared game artwork', () => {
       expect(html).toContain(`<rect x="${x}" y="${y}" width="${width}" height="${height}"`);
     }
   });
+
+  it('registers Phaser atlas frames before drawing board scenery', () => {
+    const maze = readFileSync(join(root, 'src/phaser/MazeScene.ts'), 'utf8');
+    const delivery = readFileSync(join(root, 'src/phaser/DeliveryScene.ts'), 'utf8');
+    expect(maze).toMatch(/registerAtlasFrames\(this,/);
+    const create = delivery.slice(delivery.indexOf('create():'), delivery.indexOf('update():'));
+    expect(create).toMatch(/registerAtlasFrames\(this, SPRITES\)/);
+    expect(create.indexOf('registerAtlasFrames')).toBeLessThan(create.indexOf('syncScenery'));
+    expect(delivery).toContain('drawDeliveryNetwork');
+    expect(delivery).not.toMatch(/backgroundColor:\s*'transparent'/);
+    expect(delivery).not.toMatch(/setBackgroundColor\('transparent'\)/);
+    expect(maze).toContain('paintLabelChip');
+    expect(maze).not.toMatch(/setStroke\(/);
+    expect(maze).not.toMatch(/x - 42, y - 55/);
+    expect(maze).not.toMatch(/shown\.has\(id\)/);
+    expect(maze).toMatch(/bugName\(index\), x, y, 78, 78, \{ x: 0\.5, y: 0\.84 \}/);
+    expect(delivery).toContain('paintLabelChip');
+    expect(delivery).not.toMatch(/backgroundColor:/);
+  });
 });

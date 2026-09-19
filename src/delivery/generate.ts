@@ -75,7 +75,7 @@ function valid(mission: RouteMission): boolean {
   if (!mission.nodes.start || !mission.nodes.finish) return false;
   if (mission.stops.some((stop) => !mission.nodes[stop.node])) return false;
   const path = findRouteSolution(mission, createRouteState(mission));
-  return Boolean(path && path.length);
+  return Boolean(path && path.includes('finish'));
 }
 
 function attempt(seed: number, attemptNo: number): RouteMission | null {
@@ -85,17 +85,8 @@ function attempt(seed: number, attemptNo: number): RouteMission | null {
   if (!maze) return null;
   const houses = pickHouses(maze, 3);
   if (!houses) return null;
-  for (const first of houses) {
-    for (const second of houses) {
-      if (second === first) continue;
-      for (const third of houses) {
-        if (third === first || third === second) continue;
-        const mission = asMission(maze, [first, second, third]);
-        if (valid(mission)) return mission;
-      }
-    }
-  }
-  return null;
+  const mission = asMission(maze, houses);
+  return valid(mission) ? mission : null;
 }
 
 export function generateDeliveryMission(seed = 0): RouteMission {

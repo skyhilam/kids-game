@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import type { SpriteName } from '../art/sprites';
 import type { GameState, Graph, InFlightMove, NodeId } from '../game/types';
-import GameSprite from './GameSprite.vue';
 import MazeBoard from './MazeBoard.vue';
 
 const props = defineProps<{
@@ -19,10 +17,6 @@ defineEmits<{
 }>();
 
 const roads = { border: '#c5d4ce', fill: '#f7fffc' };
-
-function bugSprite(id: NodeId): SpriteName {
-  return props.graph.hazards.indexOf(id) % 2 ? 'bug-purple' : 'bug-coral';
-}
 
 function ariaFor(to: NodeId): string {
   return `前往${props.graph.titles[to]}`;
@@ -51,10 +45,10 @@ function targetClass(to: NodeId): string {
     @move="$emit('move', $event)"
   >
     <template #target="{ link, rotate }">
-      <GameSprite v-if="graph.hazards.includes(link.to)" class="target-bug" aria-hidden="true" :name="bugSprite(link.to)" width="80" height="80"/>
-      <svg v-else viewBox="0 0 32 32" aria-hidden="true" :style="{ transform: rotate }">
+      <svg v-if="!graph.hazards.includes(link.to)" viewBox="0 0 32 32" aria-hidden="true" :style="{ transform: rotate }">
         <use href="#i-arrow"/>
       </svg>
+      <span v-else aria-hidden="true"></span>
     </template>
     <template #note>
       <div class="board-note">

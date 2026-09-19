@@ -79,6 +79,7 @@ export type MoveResult = MoveFail | MoveOk;
 export type InFlightMove = MoveOk & {
   t: number;
   startAngle: number;
+  duration: number;
 };
 
 export type Overlay =

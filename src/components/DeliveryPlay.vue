@@ -13,9 +13,8 @@ import ParentGuide from './ParentGuide.vue';
 import PlayChrome from './PlayChrome.vue';
 
 const SPEECH = {
-  welcome: '開始送貨。請先找到一號屋，再從小車出發。',
+  welcome: '開始送貨。把包裹送到三間屋，再到藍色終點。',
   win: '三份包裹都送到了，也到達終點了。',
-  stuck: '剩下的小路未能完成送貨。沒有關係，一起再試一次。',
   delivered: '包裹送到了。',
 } as const;
 
@@ -24,29 +23,28 @@ const { soundOn, toastText, toastOn, toggleSound } = usePlayAudio();
 const source = deliveryMission();
 const state = reactive(createRouteState(source));
 const narrow = ref(window.innerWidth <= 600);
-const mode = ref<'trace' | 'tap'>('trace');
+const mode = ref<'trace' | 'tap'>('tap');
 const epoch = ref(0);
 const hint = ref<string | null>(null);
 const tracingTo = ref<string | null>(null);
-const message = ref('先找一找 1 號屋，再從小車開始畫線。');
-const overlay = ref<'welcome' | 'help' | 'win' | 'stuck' | null>('welcome');
+const message = ref('把包裹送到三間屋，再到藍色終點。');
+const overlay = ref<'welcome' | 'help' | 'win' | null>('welcome');
 const mission = computed<RouteMission>(() => {
   if (!narrow.value) return source;
   return { ...source, width: 600, height: 820, nodes: Object.fromEntries(Object.entries(source.nodes)
     .map(([id, [x, y]]) => [id, [x / source.width * 600, y / source.height * 820] as Point])) };
 });
-const enabled = computed(() => !overlay.value && !state.won && !state.stalled);
-const nextStop = computed(() => mission.value.stops[state.delivered]?.label ?? '藍色終點');
+const enabled = computed(() => !overlay.value && !state.won);
+const remainingStops = computed(() => mission.value.stops.filter((stop) => !state.done.has(stop.node)));
+const nextStop = computed(() => remainingStops.value.map((stop) => stop.label).join('、') || '藍色終點');
 const stageName = computed(() => STAGE_LABEL[deliveryLoadBand(source)]);
 const deliveryGuide = parentCopy.delivery;
-const dialogTitle = computed(() => overlay.value === 'welcome' ? '小小送貨員，出發！'
-  : overlay.value === 'help' ? '這次怎樣送貨？'
-    : overlay.value === 'win' ? '包裹都送到了！' : '停一停，再想一條路');
+const dialogTitle = computed(() => overlay.value === 'help' ? '這次怎樣送貨？'
+  : overlay.value === 'win' ? '包裹都送到了！'
+    : '小小送貨員，出發！');
 
 function feedback(reason: RouteFailure | 'off-road' | 'start-at-truck'): void {
-  if (reason === 'used-road') message.value = '橙色小路已經走過了，找另一條白色小路吧。';
-  else if (reason === 'wrong-order') message.value = `要先送到 ${nextStop.value}，按 1 → 2 → 3 的次序走。`;
-  else if (reason === 'unfinished') message.value = `包裹還未送完，先去 ${nextStop.value} 吧。`;
+  if (reason === 'unfinished') message.value = `還有包裹未送，先去 ${nextStop.value} 吧。`;
   else if (reason === 'off-road') message.value = '慢慢來，回到小車旁，沿白色小路繼續畫。';
   else if (reason === 'start-at-truck') message.value = '先按住藍色小車，再沿白色小路畫線。';
 }
@@ -62,19 +60,17 @@ function move(to: string): void {
     overlay.value = 'win';
     playCue(soundOn.value, 'win');
     speak(soundOn.value, SPEECH.win);
-  } else if (state.stalled) {
-    overlay.value = 'stuck';
-    playCue(soundOn.value, 'fail');
-    speak(soundOn.value, SPEECH.stuck);
   } else if (state.delivered > before) {
     playCue(soundOn.value, 'collect');
     speak(soundOn.value, SPEECH.delivered);
-    message.value = state.delivered === mission.value.stops.length
-      ? '三份包裹都送好了！沿未走過的小路，到藍色終點吧。'
-      : `第 ${state.delivered} 份包裹送到了！下一站是 ${nextStop.value}。`;
+    message.value = remainingStops.value.length
+      ? `包裹送到了！還要去 ${nextStop.value}。`
+      : '三份包裹都送好了！去藍色終點吧。';
   } else {
     playCue(soundOn.value, 'move');
-    message.value = `下一站：${nextStop.value}。看看還有哪些白色小路。`;
+    message.value = remainingStops.value.length
+      ? `把包裹送到 ${nextStop.value}。`
+      : '去藍色終點吧。';
   }
 }
 
@@ -94,7 +90,7 @@ function restart(): void {
   Object.assign(state, createRouteState(mission.value));
   hint.value = null;
   epoch.value += 1;
-  message.value = '先找一找 1 號屋，再從小車出發。';
+  message.value = '把包裹送到三間屋，再到藍色終點。';
   overlay.value = null;
   cancelSpeech();
   playCue(soundOn.value, 'restart');
@@ -114,10 +110,7 @@ function showHint(): void {
     message.value = `試試綠色虛線這條路，繼續前往${nextStop.value}。`;
     playCue(soundOn.value, 'hint');
   } else {
-    message.value = '這條路線已經無法完成送貨，重新規劃一次吧。';
-    overlay.value = 'stuck';
-    playCue(soundOn.value, 'fail');
-    speak(soundOn.value, SPEECH.stuck);
+    message.value = '看一看地圖上還沒送到的房子。';
   }
 }
 
@@ -157,12 +150,12 @@ onUnmounted(() => window.removeEventListener('resize', resize));
       </div>
     </header>
 
-    <section class="delivery-manifest" aria-label="依序送到 1、2、3 號屋，最後到終點">
+    <section class="delivery-manifest" aria-label="送到三間屋，最後到終點">
       <div class="delivery-manifest-label"><span>今日送貨單</span><strong>{{ state.delivered }}<small> / 3</small></strong></div>
       <ol class="delivery-stops">
-        <li v-for="(stop, index) in mission.stops" :key="stop.node" :class="{ delivered: index < state.delivered, current: index === state.delivered }" :aria-current="index === state.delivered ? 'step' : undefined">
+        <li v-for="(stop, index) in mission.stops" :key="stop.node" :class="{ delivered: state.done.has(stop.node), current: !state.done.has(stop.node) && !state.won }" :aria-current="!state.done.has(stop.node) && !state.won ? 'step' : undefined">
           <span class="delivery-number">{{ index + 1 }}</span>
-          <span>{{ stop.label }}<small>{{ index < state.delivered ? '已送到 ✓' : index === state.delivered ? '下一站' : '等待送貨' }}</small></span>
+          <span>{{ stop.label }}<small>{{ state.done.has(stop.node) ? '已送到 ✓' : '還沒送到' }}</small></span>
         </li>
         <li class="delivery-finish-step" :class="{ current: state.delivered === 3, delivered: state.won }"><span class="delivery-number">⚑</span><span>終點<small>{{ state.won ? '已完成 ✓' : '送完再去' }}</small></span></li>
       </ol>
@@ -181,7 +174,7 @@ onUnmounted(() => window.removeEventListener('resize', resize));
     <section class="bottom-bar" aria-label="送貨提示及操作">
       <div class="guide">
         <div class="guide-avatar" aria-hidden="true"><GameSprite name="courier"/></div>
-        <div class="guide-copy"><div class="guide-main" role="status" aria-live="polite">{{ message }}</div><div class="guide-sub">{{ mode === 'trace' ? '未到路口可以拉返轉彎；到咗先鎖定。放手可再畫。' : '按箭嘴或方向鍵選路。' }}橙色小路不能再走。</div></div>
+        <div class="guide-copy"><div class="guide-main" role="status" aria-live="polite">{{ message }}</div><div class="guide-sub">{{ mode === 'trace' ? '未到路口可以拉返轉彎；到咗先鎖定。放手可再畫。' : '按箭嘴或方向鍵選路。' }}路可以來回走。</div></div>
       </div>
       <div class="bottom-actions">
         <button class="action-button hint" :disabled="!enabled" @click="showHint"><svg aria-hidden="true"><use href="#i-bulb"/></svg>提示</button>
@@ -199,15 +192,15 @@ onUnmounted(() => window.removeEventListener('resize', resize));
     @close="closeHelp"
   >
     <div class="dialog-inner">
-      <div class="dialog-eyebrow">{{ overlay === 'win' ? '任 務 完 成' : '觀 察 · 順 序 · 畫 線' }}</div>
+      <div class="dialog-eyebrow">{{ overlay === 'win' ? '任 務 完 成' : '觀 察 · 送 貨 · 回 家' }}</div>
       <h2 id="delivery-dialog-title" class="dialog-title">{{ dialogTitle }}</h2>
       <p v-if="overlay === 'welcome' || overlay === 'help'" class="stage-chip delivery-dialog-stage">這一張 · {{ stageName }}</p>
       <GameSprite class="delivery-hero" :name="overlay === 'win' ? 'courier' : 'truck'"/>
       <template v-if="overlay === 'welcome' || overlay === 'help'">
         <ol class="delivery-rules">
-          <li><span>1</span><div>紅色起點出發<strong>按住小車，沿白色小路畫線。</strong></div></li>
-          <li><span>2</span><div>依序送到 1 → 2 → 3 號屋<strong>到達房子，包裹便會自動送到。</strong></div></li>
-          <li><span>3</span><div>送完，再到藍色終點<strong>同一段路不能走兩次，反方向也不行。</strong></div></li>
+          <li><span>1</span><div>紅色起點出發<strong>按箭嘴選路，或改用畫線走路。</strong></div></li>
+          <li><span>2</span><div>送到三間屋<strong>哪一間先到都可以，到達就自動送包裹。</strong></div></li>
+          <li><span>3</span><div>送完，再到藍色終點<strong>同一條路可以再走，走錯可以轉彎回來。</strong></div></li>
         </ol>
         <ParentGuide :guide="deliveryGuide"/>
         <details class="delivery-parent">
@@ -218,15 +211,10 @@ onUnmounted(() => window.removeEventListener('resize', resize));
         <button class="secondary-button" type="button" @click="emit('home')">選擇遊戲</button>
       </template>
       <template v-else-if="overlay === 'win'">
-        <p class="dialog-copy">你按 1、2、3 的次序送好包裹，<br>沿不同的小路到達終點了！</p>
+        <p class="dialog-copy">你把三間屋的包裹都送到了，<br>也到達終點了！</p>
         <div class="delivery-awards"><span v-for="n in 3" :key="n"><GameSprite name="parcel"/>{{ n }} 號屋 ✓</span></div>
         <button class="primary-button" @click="restart">再送一次</button>
         <button class="secondary-button" @click="emit('home')">選擇其他遊戲</button>
-      </template>
-      <template v-else-if="overlay === 'stuck'">
-        <p class="dialog-copy">剩下的小路未能完成送貨。<br>一起看看下一次怎樣走，慢慢試就好。</p>
-        <button class="primary-button" @click="restart">重新畫一條路</button>
-        <button class="secondary-button" @click="overlay = null">先看看地圖</button>
       </template>
     </div>
   </MazeDialog>

@@ -4,6 +4,7 @@ import { playerAction, shouldPlayMotion, type PlayerAction } from '../game/playe
 import { activeSprites, library } from '../studio/store';
 import type { AppliedSprite } from '../studio/store';
 import type { ModelName } from '../studio/catalog';
+import { fitSize, labelRaster } from './display';
 
 export const BOARD_FONT = 'ui-rounded, "Arial Rounded MT Bold", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif';
 
@@ -109,6 +110,24 @@ export function syncBoardSprite(
   sprite.setOrigin(opts.origin?.x ?? 0.5, opts.origin?.y ?? 0.5);
 }
 
+export function layoutBoardSprite(
+  sprite: Phaser.GameObjects.Sprite,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  origin = { x: 0, y: 0 },
+): void {
+  const fitted = fitSize(sprite.frame.width, sprite.frame.height, width, height);
+  sprite.setOrigin(origin.x, origin.y);
+  sprite.setDisplaySize(fitted.width, fitted.height);
+  if (origin.x === 0 && origin.y === 0) {
+    sprite.setPosition(x + (width - fitted.width) / 2, y + (height - fitted.height) / 2);
+  } else {
+    sprite.setPosition(x, y);
+  }
+}
+
 export function addBoardSprite(
   scene: Phaser.Scene,
   name: SpriteName,
@@ -119,11 +138,49 @@ export function addBoardSprite(
   origin = { x: 0, y: 0 },
 ): Phaser.GameObjects.Sprite {
   const sprite = scene.add.sprite(x, y, atlasKey(name), name);
-  sprite.setOrigin(origin.x, origin.y);
-  sprite.setDisplaySize(width, height);
+  layoutBoardSprite(sprite, x, y, width, height, origin);
   return sprite;
 }
 
 export function currentAction(moving: boolean, won: boolean): PlayerAction {
   return playerAction({ moving, won });
+}
+
+export function layoutBoardLabel(
+  item: Phaser.GameObjects.Text,
+  x: number,
+  y: number,
+  value: string,
+  color: string,
+  fontSize: number,
+  worldScale: number,
+): void {
+  const { fontMul, zoom } = labelRaster(worldScale);
+  item.setFontFamily(BOARD_FONT);
+  item.setFontStyle('bold');
+  item.setColor(color);
+  item.setText(value);
+  item.setFontSize(Math.round(fontSize * fontMul));
+  item.setPadding(0, 0);
+  item.setScale(zoom);
+  item.setPosition(x, y);
+}
+
+export function paintLabelChip(
+  g: Phaser.GameObjects.Graphics,
+  item: Phaser.GameObjects.Text,
+  fill: string,
+  stroke: string,
+): void {
+  const padX = 10;
+  const padY = 5;
+  const width = item.displayWidth + padX * 2;
+  const height = item.displayHeight + padY * 2;
+  const x = item.x - item.displayWidth * item.originX - padX;
+  const y = item.y - item.displayHeight * item.originY - padY;
+  const radius = Math.min(12, height / 2);
+  g.fillStyle(rgb(fill), 1);
+  g.fillRoundedRect(x, y, width, height, radius);
+  g.lineStyle(1.25, rgb(stroke), 1);
+  g.strokeRoundedRect(x, y, width, height, radius);
 }

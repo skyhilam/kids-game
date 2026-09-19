@@ -51,8 +51,8 @@ describe('generator load bands and parent copy', () => {
     expect(parentCopy.tooth.easy.goal).toContain('蛀牙蟲');
     expect(parentCopy.tooth.basic.ask).toContain('冇蛀牙蟲');
     expect(parentCopy.tooth.puzzle.show).toContain('橙色同蟲');
-    expect(parentCopy.delivery.goal).toContain('1–3 號屋');
-    expect(parentCopy.delivery.ask).toContain('先去邊間屋');
+    expect(parentCopy.delivery.goal).toContain('三間屋');
+    expect(parentCopy.delivery.ask).toContain('未送嘅係邊間屋');
     expect(parentCopy.delivery.show).toContain('點選路口');
     expect(parentCopy.delivery.load).toContain('點選較易入手');
     expect(STAGE_PICK_INTRO).toContain('三個階段');

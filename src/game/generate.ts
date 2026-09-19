@@ -1,6 +1,6 @@
 import { firstValid, generateGridMaze, type Grid } from './gridMaze';
 import { makeGraph } from './graph';
-import { mixSeed, mulberry32, pick, shuffle } from './rng';
+import { mixSeed, mulberry32, shuffle } from './rng';
 import { findSolution } from './rules';
 import { mazeLoadBand } from './stages';
 import type { LevelDef, NodeId, Point } from './types';
@@ -35,6 +35,24 @@ function hypot(a: Point, b: Point): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1]);
 }
 
+function distToSegment(px: number, py: number, a: Point, b: Point): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1) return hypot([px, py], a);
+  const t = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / len2));
+  return Math.hypot(px - (a[0] + dx * t), py - (a[1] + dy * t));
+}
+
+function onExistingRoad(
+  nodes: Record<NodeId, Point>,
+  edges: [string, string][],
+  point: Point,
+  minDist = 58,
+): boolean {
+  return edges.some(([a, b]) => distToSegment(point[0], point[1], nodes[a]!, nodes[b]!) < minDist);
+}
+
 function gridFor(kind: MazeKind, index: number, rand: () => number): Grid {
   const roll = rand();
   const band = mazeLoadBand(index);
@@ -64,9 +82,23 @@ function addSpur(
   for (const point of options) {
     if (point[0] < 90 || point[0] > 750 || point[1] < 140 || point[1] > 600) continue;
     if (Object.values(nodes).some((other) => hypot(point, other) < 90)) continue;
+    if (onExistingRoad(nodes, edges, point)) continue;
     nodes[id] = point;
     edges.push([from, id]);
     return id;
+  }
+  return null;
+}
+
+function placeSpur(
+  nodes: Record<NodeId, Point>,
+  edges: [string, string][],
+  hosts: string[],
+  rand: () => number,
+): string | null {
+  for (const from of shuffle(rand, hosts)) {
+    const id = addSpur(nodes, edges, from, rand);
+    if (id) return id;
   }
   return null;
 }
@@ -163,7 +195,7 @@ function attempt(kind: MazeKind, index: number, attemptNo: number, seed: number)
   const spare = shuffle(rand, ids.filter((id) => !onPath.has(id)));
   let hazards = spare.slice(0, Math.min(spare.length, 1 + (index % 3)));
   if (!hazards.length) {
-    const spur = addSpur(nodes, edges, pick(rand, [...onPath]), rand);
+    const spur = placeSpur(nodes, edges, [...onPath], rand);
     if (spur) hazards = [spur];
   }
   if (!hazards.length) return null;

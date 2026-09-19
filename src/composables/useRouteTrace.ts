@@ -75,9 +75,10 @@ export function useRouteTrace(options: {
       canEnter: (from, to) => {
         const state = options.state();
         if (from === state.node) return checkRouteMove(mission, state, to).ok;
-        const preview = { ...state, node: from, used: new Set(state.used) };
+        const preview = { ...state, node: from, used: new Set(state.used), done: new Set(state.done) };
         preview.used.add(roadKey(state.node, from));
-        if (mission.stops[preview.delivered]?.node === from) preview.delivered += 1;
+        if (mission.stops.some((stop) => stop.node === from)) preview.done.add(from);
+        preview.delivered = preview.done.size;
         return checkRouteMove(mission, preview, to).ok;
       },
       tolerance: tolerance(),

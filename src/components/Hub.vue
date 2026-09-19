@@ -39,7 +39,7 @@ const emit = defineEmits<{
           <GameSprite name="parcel" x="156" y="68" width="40" height="38"/>
         </svg>
         <strong>送貨員來了</strong>
-        <span>畫線送到 1、2、3 號屋，再到終點。</span>
+        <span>送到三間屋，再到終點。</span>
         <small class="hub-stages">{{ STAGE_OVERVIEW }}</small>
         <small class="hub-modes">可先點選，再試畫線</small>
       </button>

@@ -66,6 +66,33 @@ describe('endless maze maps', () => {
     });
   });
 
+  it('keeps tooth bugs off other roads so they stand on their own junction', () => {
+    const distToSegment = (px: number, py: number, a: readonly number[], b: readonly number[]) => {
+      const dx = b[0]! - a[0]!;
+      const dy = b[1]! - a[1]!;
+      const len2 = dx * dx + dy * dy;
+      if (len2 < 1) return Math.hypot(px - a[0]!, py - a[1]!);
+      const t = Math.max(0, Math.min(1, ((px - a[0]!) * dx + (py - a[1]!) * dy) / len2));
+      return Math.hypot(px - (a[0]! + dx * t), py - (a[1]! + dy * t));
+    };
+    for (const seed of [0, 7, 11, 42, 4242]) {
+      for (let index = 0; index < 20; index += 1) {
+        const { graph } = createGame((i) => toothLevel(i, seed), index);
+        expect(graph.hazards.length, `tooth ${seed}/${index}`).toBeGreaterThan(0);
+        for (const id of graph.hazards) {
+          const [x, y] = graph.nodes[id];
+          for (const edge of graph.edges) {
+            if (edge.a === id || edge.b === id) continue;
+            expect(
+              distToSegment(x, y, graph.nodes[edge.a], graph.nodes[edge.b]),
+              `bug ${id} on ${edge.id} (${seed}/${index})`,
+            ).toBeGreaterThan(50);
+          }
+        }
+      }
+    }
+  });
+
   it('gives picnic and tooth a solution on many maps', () => {
     for (let index = 0; index < 30; index += 1) {
       const picnic = createGame(picnicLevel, index);

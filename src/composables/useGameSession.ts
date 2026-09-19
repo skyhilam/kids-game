@@ -1,5 +1,6 @@
 import { computed, getCurrentInstance, onUnmounted, reactive, ref, shallowRef } from 'vue';
 import type { SessionCopy } from '../game/copy';
+import { EventBus } from '../phaser/EventBus';
 import { clamp, heading, moveDuration } from '../game/motion';
 import {
   applyMove,
@@ -136,36 +137,48 @@ export function useGameSession(hooks: {
     const length = Math.hypot(toPt[0] - fromPt[0], toPt[1] - fromPt[1]);
     const duration = moveDuration(length, reduceMotion);
     const targetAngle = heading(fromPt, toPt);
-    inFlight.value = { ...result, t: 0, startAngle: facing.value };
+    inFlight.value = { ...result, t: 0, startAngle: facing.value, duration };
 
     let time0: number | null = null;
     const frame = (time: number) => {
-      if (currentEpoch !== epoch.value) return;
+      if (currentEpoch !== epoch.value || !inFlight.value) return;
       if (time0 === null) time0 = time;
       const t = clamp((time - time0) / duration, 0, 1);
-      if (inFlight.value) inFlight.value.t = t;
       if (t < 1) {
         requestAnimationFrame(frame);
         return;
       }
-      applyMove(game, result);
-      facing.value = targetAngle;
-      if (result.won) {
-        const nextCompleted = new Set(completed.value);
-        nextCompleted.add(game.level);
-        completed.value = nextCompleted;
-        overlay.value = { kind: 'win' };
-      } else if (result.stalled) {
-        overlay.value = { kind: 'stuck', reason: result.stalled };
-      }
-      inFlight.value = null;
-      const arrived = copy.arrivalGuide(graph.value, result, game.used);
-      guideMain.value = arrived.main;
-      guideSub.value = arrived.sub;
-      hooks.onSettled?.(result);
+      inFlight.value.t = 1;
+      settleFlight(currentEpoch, result, targetAngle);
     };
     requestAnimationFrame(frame);
     return result;
+  }
+
+  function settleFlight(currentEpoch: number, result: MoveOk, targetAngle: number): void {
+    if (currentEpoch !== epoch.value || !inFlight.value) return;
+    applyMove(game, result);
+    facing.value = targetAngle;
+    if (result.won) {
+      const nextCompleted = new Set(completed.value);
+      nextCompleted.add(game.level);
+      completed.value = nextCompleted;
+      overlay.value = { kind: 'win' };
+    } else if (result.stalled) {
+      overlay.value = { kind: 'stuck', reason: result.stalled };
+    }
+    inFlight.value = null;
+    const arrived = copy.arrivalGuide(graph.value, result, game.used);
+    guideMain.value = arrived.main;
+    guideSub.value = arrived.sub;
+    hooks.onSettled?.(result);
+  }
+
+  function onFlightComplete(): void {
+    const flight = inFlight.value;
+    if (!flight || flight.t < 1) return;
+    const targetAngle = heading(graph.value.nodes[flight.from], graph.value.nodes[flight.to]);
+    settleFlight(epoch.value, flight, targetAngle);
   }
 
   function requestHint(): 'hint' | 'rescue' | 'blocked' {
@@ -212,8 +225,10 @@ export function useGameSession(hooks: {
     graph.value = makeGraph(catalog, game.level, next, copy.labels);
   }
 
+  EventBus.on('flight-complete', onFlightComplete);
   if (getCurrentInstance()) {
     onUnmounted(() => {
+      EventBus.off('flight-complete', onFlightComplete);
       epoch.value += 1;
       window.clearTimeout(layoutTimer);
     });
