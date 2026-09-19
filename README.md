@@ -65,12 +65,12 @@ iPad／iPhone：用 **Safari** 打開上面網址即可。按分享鈕 →「加
 
 ### Canvas 素材工房
 
-首頁下方的「素材工房」可按遊戲／關卡製作目前使用的 22 種單個素材。沿用遊戲原畫的繪本風格，支援構圖、局部調色、原畫裝飾、可重現種子與鎖定。小車提供 8 張揮手、眨眼及車輪轉動的獨立動作原畫；工房改為選動作後，一鍵透過 OpenAI 圖像 API（預設 GPT Image 2.5 Sunburst）生成 4／8／12 張新姿勢，已移除整圖動效。在工房貼上 OpenAI API token 即可新增動作；token 只供目前頁面使用，不會儲存，重新整理即清除。正式靜態網站由瀏覽器直接連 OpenAI，毋須另開本機服務；也可使用已有／匯入的動作。可逐格預覽並匯出 sprite sheet PNG、影格 JSON 及整包 ZIP，動畫設定會隨完成紀錄保存。套用到遊戲後，有動作影格的素材會按設定 FPS 循環播放，重新整理仍會恢復；沒有影格則使用單張造型，並可隨時恢復原畫。
+首頁下方的「素材工房」可按遊戲／關卡製作目前使用的 22 種單個素材。沿用遊戲原畫的繪本風格，支援構圖、局部調色、原畫裝飾、可重現種子與鎖定。小車提供 8 張揮手、眨眼及車輪轉動的獨立動作原畫；工房改為選動作後，一鍵透過 OpenAI 圖像 API（預設 GPT Image 2.5 Sunburst）生成 4／8／12 張新姿勢，已移除整圖動效。在工房貼上 OpenAI API token 即可新增動作；token 只供目前頁面使用，不會儲存，重新整理即清除。正式靜態網站由瀏覽器直接連 OpenAI，毋須另開本機服務；也可使用已有／匯入的動作。可逐格預覽並匯出 sprite sheet PNG、影格 JSON 及整包 ZIP，動畫設定會隨完成紀錄保存。套用到遊戲後，有動作影格的棋盤角色由 Phaser 按設定 FPS 播放，並依待機／開車／歡呼條件切換；重新整理仍會恢復。沒有影格則使用單張造型，並可隨時恢復原畫。
 
 執行 `npm run dev` 後開啟 `/kids-game/#sprite-studio`。已接入 OpenAI 官方 [sprite-pipeline 流程](docs/SPRITE_PIPELINE.md)：原畫放入透明參考畫布，一次生成整組姿勢，再以共同比例整理定位。操作、範圍與維護方式見 [Canvas 素材工房](docs/SPRITE_STUDIO.md)。
 
-Vue 3 + TypeScript + Vite。各款遊戲共用透明插畫素材庫，由 `src/art/sprites.ts` 登記，透過 `GameSprite.vue` 使用。新增遊戲可直接重用角色、場景和道具，詳見 [共用素材使用說明](src/art/README.md)；參考照片的逐張處理狀態見 [處理紀錄](src/art/reference-progress.json)。箭頭、音量等介面符號保留為可變色的 SVG。
-支援觸控、滑鼠、方向鍵，響應式手機／平板版面及減少動態效果設定。
+Vue 3 + TypeScript + Vite，遊戲畫面由 Phaser 4 繪製（官方 Vue＋TypeScript＋Vite 整合方式：`PhaserGame.vue` 橋接、EventBus、Scene）。素材工房、API token 與完成紀錄繼續用 Vue；關卡生成、路線規則與勝負判定沿用 `src/game/` TypeScript。繪本 PNG 與工房動作影格接入 Phaser 動畫（FPS、循環、暫停、`animationcomplete`）；待機／開車／歡呼的切換條件在 `src/game/playerAction.ts`。各款遊戲共用插畫素材庫，由 `src/art/sprites.ts` 登記；Vue 介面仍透過 `GameSprite.vue` 顯示選單與對話框插畫。新增遊戲可直接重用角色、場景和道具，詳見 [共用素材使用說明](src/art/README.md)；參考照片的逐張處理狀態見 [處理紀錄](src/art/reference-progress.json)。箭頭、音量等介面符號保留為可變色的 SVG。
+支援觸控、滑鼠、方向鍵，響應式手機／平板版面及減少動態效果設定。棋盤上方保留 HTML 目標按鈕以維持鍵盤與讀屏操作。
 野餐與刷牙共用無向迷宮規則（`src/game/`）；關卡與文案分屬 `src/picnic/` 與 `src/tooth/`。送貨為獨立路線任務。可用 `npm test` 驗證。
 公開 repo 嘅 `main` 已禁止 force-push／刪除分支，Wiki 關閉。
 

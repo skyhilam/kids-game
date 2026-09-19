@@ -20,6 +20,12 @@ function pathD(nodes: Graph['nodes'], from: NodeId, to: NodeId): string {
   return `M${a[0]},${a[1]} L${b[0]},${b[1]}`;
 }
 
+function usedTrails(graph: Graph, state: GameState): { edge: string; d: string }[] {
+  return graph.edges
+    .filter((edge) => state.used.has(edge.id))
+    .map((edge) => ({ edge: edge.id, d: traveledPath(graph.nodes, edge, state.usedFrom[edge.id]) }));
+}
+
 const REVERSE_LINE: LevelDef = {
   name: '反向小路',
   short: '反向',
@@ -30,7 +36,7 @@ const REVERSE_LINE: LevelDef = {
   edges: [['a', 's'], ['h', 'a'], ['p', 'h']],
 };
 
-async function renderBoard(graph: Graph, state: GameState): Promise<string> {
+async function renderBoard(graph: Graph, state: GameState, theme: 'picnic' | 'tooth' = 'picnic'): Promise<string> {
   return renderToString(createSSRApp({
     render: () => h(MazeBoard, {
       graph,
@@ -40,18 +46,10 @@ async function renderBoard(graph: Graph, state: GameState): Promise<string> {
       facing: 90,
       hintNode: null,
       inFlight: null,
+      theme,
       boardLabel: 'trail test',
     }),
   }));
-}
-
-function usedTrailDs(html: string): { edge: string; d: string }[] {
-  return [...html.matchAll(/<path\b[^>]*class="road-used"[^>]*>/g)].flatMap((match) => {
-    const tag = match[0];
-    const d = tag.match(/\bd="([^"]+)"/)?.[1];
-    const edge = tag.match(/\bdata-edge="([^"]+)"/)?.[1];
-    return d && edge ? [{ d, edge }] : [];
-  });
 }
 
 function targetNodes(html: string): string[] {
@@ -89,13 +87,12 @@ describe('used-trail travel direction', () => {
     play(graph, state, 'a');
     play(graph, state, graph.collect!);
 
-    const html = await renderBoard(graph, state);
-    expect(usedTrailDs(html)).toEqual([
+    expect(usedTrails(graph, state)).toEqual([
       { d: pathD(graph.nodes, 's', 'a'), edge: 'a-s' },
       { d: pathD(graph.nodes, 'a', 'h'), edge: 'a-h' },
     ]);
-    expect(html.match(/class="road-used"/g)).toHaveLength(2);
-    expect(html.match(/class="road-used-inner"/g)).toHaveLength(2);
+    const html = await renderBoard(graph, state);
+    expect(html).toContain('phaser-board');
     expect(targetNodes(html)).toEqual(available(graph, state.node, state.used).map((link) => link.to).sort());
     expect(targetNodes(html)).toEqual(['b']);
   });
@@ -111,15 +108,15 @@ describe('used-trail travel direction', () => {
     expect(state.usedFrom['a-s']).toBe('s');
     expect(state.usedFrom['a-h']).toBe('a');
 
-    const html = await renderBoard(graph, state);
     const stored = pathD(graph.nodes, 'a', 's');
     const traveled = pathD(graph.nodes, 's', 'a');
     expect(stored).not.toBe(traveled);
-    expect(usedTrailDs(html)).toEqual([
+    expect(usedTrails(graph, state)).toEqual([
       { d: traveled, edge: 'a-s' },
       { d: pathD(graph.nodes, 'a', 'h'), edge: 'a-h' },
     ]);
-    expect(usedTrailDs(html).some((item) => item.d === stored)).toBe(false);
+    expect(usedTrails(graph, state).some((item) => item.d === stored)).toBe(false);
+    const html = await renderBoard(graph, state);
     expect(targetNodes(html)).toEqual(['p']);
   });
 
@@ -128,12 +125,13 @@ describe('used-trail travel direction', () => {
     play(graph, state, 'a');
     play(graph, state, 'x');
 
-    const html = await renderBoard(graph, state);
-    expect(usedTrailDs(html)).toEqual([
+    expect(usedTrails(graph, state)).toEqual([
       { d: pathD(graph.nodes, 's', 'a'), edge: 'a-s' },
       { d: pathD(graph.nodes, 'a', 'x'), edge: 'a-x' },
     ]);
-    expect(html).not.toContain('data-edge="a-g"');
+    expect(usedTrails(graph, state).some((item) => item.edge === 'a-g')).toBe(false);
+    const html = await renderBoard(graph, state, 'tooth');
+    expect(html).toContain('phaser-board');
     expect(targetNodes(html)).toEqual([]);
   });
 });

@@ -5,7 +5,7 @@ import { continueAlong, followRouteStroke, type RoadTrace } from '../game/trace'
 import type { Point } from '../game/types';
 
 export function useRouteTrace(options: {
-  surface: Ref<SVGSVGElement | null>;
+  surface: Ref<HTMLElement | null>;
   mission: () => RouteMission;
   state: () => RouteState;
   enabled: () => boolean;
@@ -24,18 +24,13 @@ export function useRouteTrace(options: {
   });
 
   function pointerPoint(event: PointerEvent): Point {
-    const svg = options.surface.value!;
-    const ctm = svg.getScreenCTM();
-    if (ctm) {
-      const pt = svg.createSVGPoint();
-      pt.x = event.clientX;
-      pt.y = event.clientY;
-      const mapped = pt.matrixTransform(ctm.inverse());
-      return [mapped.x, mapped.y];
-    }
-    const rect = svg.getBoundingClientRect();
+    const el = options.surface.value!;
+    const rect = el.getBoundingClientRect();
     const mission = options.mission();
-    return [(event.clientX - rect.left) / rect.width * mission.width, (event.clientY - rect.top) / rect.height * mission.height];
+    return [
+      (event.clientX - rect.left) / rect.width * mission.width,
+      (event.clientY - rect.top) / rect.height * mission.height,
+    ];
   }
 
   function tolerance(): number {

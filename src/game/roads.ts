@@ -45,6 +45,47 @@ export function centerDashOffset(a: Point, b: Point): number {
   return (from[0] * dx + from[1] * dy) / len;
 }
 
+export const ROAD_CENTER_DASH = 8;
+export const ROAD_CENTER_GAP = 13;
+export const ROAD_USED_INNER_DASH = 2;
+export const ROAD_USED_INNER_GAP = 14;
+
+/** SVG-equivalent dash segments: pattern index is `(distance - offset) mod period`. */
+export function dashedSegments(
+  a: Point,
+  b: Point,
+  dash = ROAD_CENTER_DASH,
+  gap = ROAD_CENTER_GAP,
+  offset = centerDashOffset(a, b),
+): Array<[Point, Point]> {
+  const [from, to] = canonicalEnds(a, b);
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  const len = Math.hypot(dx, dy);
+  if (len < AXIS_EPS || dash <= 0) return [];
+  const ux = dx / len;
+  const uy = dy / len;
+  const period = dash + gap;
+  const segments: Array<[Point, Point]> = [];
+  const at = (d: number): Point => [from[0] + ux * d, from[1] + uy * d];
+  const phase = (d: number): number => {
+    const p = d - offset;
+    return ((p % period) + period) % period;
+  };
+  let d = 0;
+  while (d < len - AXIS_EPS) {
+    const m = phase(d);
+    if (m < dash) {
+      const end = Math.min(len, d + (dash - m));
+      if (end > d) segments.push([at(d), at(end)]);
+      d = end;
+    } else {
+      d = Math.min(len, d + (period - m));
+    }
+  }
+  return segments;
+}
+
 /** Unique node ids that appear on any of the given edges, in first-seen order. */
 export function jointIds(edges: ReadonlyArray<{ a: NodeId; b: NodeId }>): NodeId[] {
   const ids: NodeId[] = [];
