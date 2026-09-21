@@ -95,6 +95,14 @@ describe('shared play cues', () => {
     expect(listen).toContain("setListenLang('en')");
     expect(listen).toContain("setListenLang('yue')");
     expect(listen).not.toMatch(/speak\(soundOn\.value,\s*WORD_ZH\[board\.value\.target\]\)/);
+
+    const sequence = readFileSync(join(root, 'src/components/SequencePlay.vue'), 'utf8');
+    expect(sequence).toContain('usePlayAudio');
+    expect(sequence).toContain("soundOn ? '關閉音效' : '開啟音效'");
+    expect(sequence).toContain("playCue(soundOn.value, 'collect')");
+    expect(sequence).toContain("playCue(soundOn.value, 'hint')");
+    expect(sequence).toContain("playCue(soundOn.value, 'win')");
+    expect(sequence).not.toMatch(/speakEnglish|speakListenWord|speak\(/);
   });
 });
 

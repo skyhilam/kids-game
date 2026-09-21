@@ -9,6 +9,7 @@ import {
   STAGE_OVERVIEW,
   STAGE_PICK_INTRO,
   listenLoadBand,
+  sequenceLoadBand,
   stickerLoadBand,
 } from '../src/game/stages';
 
@@ -73,6 +74,13 @@ describe('generator load bands and parent copy', () => {
     expect(parentCopy.listen.puzzle.show).toContain('再聽一次');
     expect(parentCopy.listen.easy.goal).not.toBe(parentCopy.listen.basic.goal);
     expect(parentCopy.listen.basic.ask).not.toBe(parentCopy.listen.puzzle.ask);
+    expect(sequenceLoadBand(0)).toBe(mazeLoadBand(0));
+    expect(sequenceLoadBand(8)).toBe(mazeLoadBand(8));
+    expect(parentCopy.sequence.easy.goal).toBe('用 3 個步驟練習「邊樣先、邊樣後」，點選排出次序。');
+    expect(parentCopy.sequence.basic.ask).toContain('邊兩步好似好近');
+    expect(parentCopy.sequence.puzzle.show).toContain('由左睇到右');
+    expect(parentCopy.sequence.easy.goal).not.toBe(parentCopy.sequence.basic.goal);
+    expect(parentCopy.sequence.basic.ask).not.toBe(parentCopy.sequence.puzzle.ask);
     expect(JSON.stringify({ parentCopy, STAGE_PICK_INTRO })).not.toMatch(claims);
   });
 });
