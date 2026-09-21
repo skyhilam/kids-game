@@ -35,9 +35,9 @@ describe('hub landing metadata', () => {
     expect(hub).toMatch(/<strong>貼紙學單字<\/strong>/);
     expect(hub).toMatch(/拖貼紙配英文詞，全部放對就過關/);
     expect(hub).toMatch(/emit\('pick', 'sticker'\)/);
-    expect(app).toMatch(/'hub' \| 'picnic' \| 'tooth' \| 'delivery' \| 'sticker' \| 'listen'/);
+    expect(app).toMatch(/'hub' \| 'picnic' \| 'tooth' \| 'delivery' \| 'sticker' \| 'listen' \| 'sequence'/);
     expect(app).toMatch(/StickerPlay/);
-    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(5);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(6);
   });
 
   it('adds 聽一聽揀圖 as a fifth card with listen activity', () => {
@@ -49,8 +49,21 @@ describe('hub landing metadata', () => {
     expect(hub).toMatch(/emit\('pick', 'listen'\)/);
     expect(app).toMatch(/ListenPlay/);
     expect(app).toMatch(/activity === 'listen'/);
-    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(5);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(6);
     expect(hub).toMatch(/emit\('pick', 'picnic'\)/);
     expect(hub).toMatch(/emit\('pick', 'sticker'\)/);
+  });
+
+  it('adds 出遊順序卡 as a sixth card with sequence activity', () => {
+    const hub = readFileSync(join(root, 'src/components/Hub.vue'), 'utf8');
+    const app = readFileSync(join(root, 'src/App.vue'), 'utf8');
+    expect(hub).toMatch(/<strong>出遊順序卡<\/strong>/);
+    expect(hub).toMatch(/依序點選步驟，排出正確出遊次序。/);
+    expect(hub).toMatch(/STAGE_OVERVIEW.*點選排序|點選排序/);
+    expect(hub).toMatch(/emit\('pick', 'sequence'\)/);
+    expect(app).toMatch(/SequencePlay/);
+    expect(app).toMatch(/activity === 'sequence'/);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(6);
+    expect(hub).toMatch(/emit\('pick', 'listen'\)/);
   });
 });

@@ -2,7 +2,7 @@
 import { STAGE_OVERVIEW } from '../game/stages';
 import GameSprite from './GameSprite.vue';
 const emit = defineEmits<{
-  pick: [activity: 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen'];
+  pick: [activity: 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen' | 'sequence'];
 }>();
 </script>
 
@@ -79,6 +79,17 @@ const emit = defineEmits<{
         <strong>聽一聽揀圖</strong>
         <span>聽到詞之後，點啱嘅圖。</span>
         <small class="hub-modes">{{ STAGE_OVERVIEW }} · 聽詞揀圖</small>
+      </button>
+      <button class="hub-card" type="button" @click="emit('pick', 'sequence')">
+        <svg class="hub-art" viewBox="0 0 220 120" aria-hidden="true">
+          <rect width="220" height="120" rx="22" fill="#efe6d6"/>
+          <GameSprite name="home" x="8" y="22" width="68" height="70"/>
+          <GameSprite name="burger" x="80" y="30" width="58" height="54"/>
+          <GameSprite name="park" x="146" y="18" width="66" height="72"/>
+        </svg>
+        <strong>出遊順序卡</strong>
+        <span>依序點選步驟，排出正確出遊次序。</span>
+        <small class="hub-modes">{{ STAGE_OVERVIEW }} · 點選排序</small>
       </button>
     </div>
     <p class="hub-studio-link"><a href="#sprite-studio">素材工房 <span>用 Canvas 製作自己的遊戲素材 →</span></a></p>

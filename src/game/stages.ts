@@ -45,6 +45,11 @@ export function listenLoadBand(index = 0): LoadBand {
   return mazeLoadBand(index);
 }
 
+/** Same picnic/brush/sticker/listen bands: 0 easy, 1–7 basic, 8+ puzzle. */
+export function sequenceLoadBand(index = 0): LoadBand {
+  return mazeLoadBand(index);
+}
+
 export const STAGE_PICK_INTRO =
   '地圖分簡單、基礎、益智三個階段。階段只說明這回路徑同思考負荷，方便按孩子當下狀態點揀，不是年齡分級，也不是能力評分。';
 
@@ -123,10 +128,28 @@ export const parentCopy = {
       show: '家長示範撳「再聽一次」，之後交返孩子；卡住先提示睇晒所有圖再揀。',
     },
   },
+  sequence: {
+    easy: {
+      goal: '用 3 個步驟練習「邊樣先、邊樣後」，點選排出次序。',
+      ask: '「我哋先去邊？之後呢？」',
+      show: '家長示範點第一張放入槽 1，之後交返孩子排其餘。',
+    },
+    basic: {
+      goal: '用 4 個步驟排出完整出遊；中間可能多一站（商店／坐車）。',
+      ask: '「邊兩步好似好近？邊個要先做？」',
+      show: '家長指出兩個可能調轉嘅步驟，唔代排；等孩子講完再自己點。',
+    },
+    puzzle: {
+      goal: '用 5 個步驟排出較長出遊；出發前先想成條序。',
+      ask: '「出發前你想點排？有冇一步放錯就去唔到公園？」',
+      show: '家長用手指空劃一次正確序（唔代點），再交孩子；卡住先提示由左睇到右。',
+    },
+  },
 } as const satisfies {
   picnic: Record<LoadBand, ParentGuide>;
   tooth: Record<LoadBand, ParentGuide>;
   delivery: ParentGuide & { load: string };
   sticker: Record<LoadBand, ParentGuide>;
   listen: Record<LoadBand, ParentGuide>;
+  sequence: Record<LoadBand, ParentGuide>;
 };
