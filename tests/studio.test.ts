@@ -12,7 +12,7 @@ describe('Canvas sprite studio', () => {
     expect(new Set(modelNames)).toEqual(new Set(originals));
     expect(new Set(Object.values(kits).flatMap(kit => [...kit.sprites]))).toEqual(new Set(modelNames));
     for (const kit of Object.values(kits)) for (const name of kit.sprites) expect(models).toHaveProperty(name);
-    expect(kits.sticker.sprites).toEqual(WORD_IDS);
+    expect(kits.sticker.sprites).toEqual(WORD_IDS.filter((id) => Object.hasOwn(models, id)));
     expect(new Set(kits.sticker.sprites).size).toBe(kits.sticker.sprites.length);
   });
   it('reproduces a seeded combination and preserves locked parts including custom colors', () => {

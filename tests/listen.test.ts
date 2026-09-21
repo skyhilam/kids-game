@@ -73,16 +73,21 @@ describe('listen bands, N/K, and deals', () => {
     expect(dealListen(7, 0)).toEqual(easy);
     expect(dealListen(7)).toEqual(easy);
 
-    const laterTheme = ['burger', 'shop', 'truck', 'picnic', 'parcel', 'tooth', 'toothbrush', 'bug-coral'] as const;
+    const laterTheme = [
+      'burger', 'shop', 'truck', 'picnic', 'parcel', 'tooth', 'toothbrush', 'bug-coral',
+      'dog', 'cat', 'chicken', 'duck', 'cow', 'pig', 'sheep', 'horse',
+    ] as const;
     const easySeen = new Set(Array.from({ length: 48 }, (_, seed) => dealListen(seed, 0).options).flat());
     expect(laterTheme.every((id) => !easySeen.has(id))).toBe(true);
 
     const basicSeen = new Set(Array.from({ length: 80 }, (_, seed) => dealListen(seed, 1).options).flat());
     expect(basicSeen.has('burger') || basicSeen.has('shop') || basicSeen.has('truck')).toBe(true);
-    expect((['parcel', 'tooth', 'toothbrush', 'bug-coral'] as const).every((id) => !basicSeen.has(id))).toBe(true);
+    expect(['dog', 'cat', 'chicken', 'duck'].some((id) => basicSeen.has(id))).toBe(true);
+    expect((['parcel', 'tooth', 'toothbrush', 'bug-coral', 'cow', 'pig', 'sheep', 'horse'] as const).every((id) => !basicSeen.has(id))).toBe(true);
 
     const puzzleSeen = new Set(Array.from({ length: 80 }, (_, seed) => dealListen(seed, 8).options).flat());
     expect(puzzleSeen.has('toothbrush')).toBe(true);
+    expect(['cow', 'pig', 'sheep', 'horse'].some((id) => puzzleSeen.has(id))).toBe(true);
   });
 
   it('forces a similarity distractor on basic/puzzle when a peer is in the band pool', () => {
@@ -94,6 +99,16 @@ describe('listen bands, N/K, and deals', () => {
     expect(similarityPeers('tooth', PUZZLE_POOL)).toEqual(['toothbrush']);
     expect(similarityPeers('car', EASY_POOL)).toEqual([]);
     expect(similarityPeers('tree', EASY_POOL)).toEqual(['flower']);
+    expect(similarityPeers('dog', BASIC_POOL)).toEqual(['cat']);
+    expect(similarityPeers('cat', BASIC_POOL)).toEqual(['dog']);
+    expect(similarityPeers('chicken', BASIC_POOL)).toEqual(['duck']);
+    expect(similarityPeers('duck', BASIC_POOL)).toEqual(['chicken']);
+    expect(similarityPeers('cow', PUZZLE_POOL)).toEqual(['horse']);
+    expect(similarityPeers('horse', PUZZLE_POOL)).toEqual(['cow']);
+    expect(similarityPeers('pig', PUZZLE_POOL)).toEqual(['sheep']);
+    expect(similarityPeers('sheep', PUZZLE_POOL)).toEqual(['pig']);
+    expect(similarityPeers('dog', EASY_POOL)).toEqual([]);
+    expect(similarityPeers('cow', BASIC_POOL)).toEqual([]);
 
     for (const seed of Array.from({ length: 80 }, (_, i) => i)) {
       const deal = dealListen(seed, 1);
