@@ -19,6 +19,14 @@ export const WORD_IDS = [
   'tooth',
   'toothbrush',
   'bug-coral',
+  'dog',
+  'cat',
+  'chicken',
+  'duck',
+  'cow',
+  'pig',
+  'sheep',
+  'horse',
 ] as const satisfies readonly SpriteName[];
 
 export type WordId = (typeof WORD_IDS)[number];
@@ -49,6 +57,10 @@ export const BASIC_POOL: readonly WordId[] = [
   'shop',
   'truck',
   'picnic',
+  'dog',
+  'cat',
+  'chicken',
+  'duck',
 ];
 
 /** Full word list: basic plus longer / brushing-theme words. */
@@ -58,6 +70,10 @@ export const PUZZLE_POOL: readonly WordId[] = [
   'tooth',
   'toothbrush',
   'bug-coral',
+  'cow',
+  'pig',
+  'sheep',
+  'horse',
 ];
 
 export const STICKER_POOL: Record<LoadBand, readonly WordId[]> = {
@@ -101,6 +117,14 @@ export const WORD_ZH: Record<WordId, string> = {
   tooth: '牙齒',
   toothbrush: '牙刷',
   'bug-coral': '蟲',
+  dog: '狗',
+  cat: '貓',
+  chicken: '雞',
+  duck: '鴨',
+  cow: '牛',
+  pig: '豬',
+  sheep: '羊',
+  horse: '馬',
 };
 
 /** English TTS / UI label. Differs from WordId when the sprite id is not the spoken word. */
@@ -121,6 +145,14 @@ export const WORD_EN: Record<WordId, string> = {
   tooth: 'tooth',
   toothbrush: 'toothbrush',
   'bug-coral': 'bug',
+  dog: 'dog',
+  cat: 'cat',
+  chicken: 'chicken',
+  duck: 'duck',
+  cow: 'cow',
+  pig: 'pig',
+  sheep: 'sheep',
+  horse: 'horse',
 };
 
 export function isWordId(id: string): id is WordId {

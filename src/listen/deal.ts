@@ -25,6 +25,10 @@ export const SIMILARITY_GROUPS: readonly (readonly WordId[])[] = [
   ['tooth', 'toothbrush'],
   ['bear', 'kid'],
   ['burger', 'picnic'],
+  ['dog', 'cat'],
+  ['chicken', 'duck'],
+  ['cow', 'horse'],
+  ['pig', 'sheep'],
 ];
 
 export type ListenDeal = {

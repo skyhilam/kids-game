@@ -57,34 +57,57 @@ describe('sequence bands, N, and stories', () => {
   });
 
   it('keeps acceptance stories, labels, and existing sprites', () => {
-    expect(EASY_STORIES.map((story) => story.id)).toEqual(['picnic-basic', 'drive-park', 'kid-brush']);
-    expect(BASIC_STORIES.map((story) => story.id)).toEqual(['picnic-shop', 'picnic-spread', 'delivery-short']);
-    expect(PUZZLE_STORIES.map((story) => story.id)).toEqual(['picnic-full', 'picnic-burger', 'delivery-day']);
+    expect(EASY_STORIES.map((story) => story.id)).toEqual([
+      'picnic-basic', 'drive-park', 'kid-brush', 'farm-pets', 'farm-pond',
+    ]);
+    expect(BASIC_STORIES.map((story) => story.id)).toEqual([
+      'picnic-shop', 'picnic-spread', 'delivery-short', 'farm-visit', 'farm-barn',
+    ]);
+    expect(PUZZLE_STORIES.map((story) => story.id)).toEqual([
+      'picnic-full', 'picnic-burger', 'delivery-day', 'farm-day', 'farm-yard',
+    ]);
     expect(SEQUENCE_POOL.easy).toEqual(EASY_STORIES);
     expect(SEQUENCE_POOL.basic).toEqual(BASIC_STORIES);
     expect(SEQUENCE_POOL.puzzle).toEqual(PUZZLE_STORIES);
-    expect(SEQUENCE_STORIES).toHaveLength(9);
+    expect(EASY_STORIES).toHaveLength(5);
+    expect(BASIC_STORIES).toHaveLength(5);
+    expect(PUZZLE_STORIES).toHaveLength(5);
+    expect(SEQUENCE_STORIES).toHaveLength(15);
 
     const expected: Record<SequenceStoryId, string[]> = {
       'picnic-basic': ['home家', 'burger漢堡', 'park公園'],
       'drive-park': ['home家', 'car小車', 'park公園'],
       'kid-brush': ['kid小朋友', 'toothbrush牙刷', 'tooth牙齒'],
+      'farm-pets': ['dog狗', 'cat貓', 'rabbit兔'],
+      'farm-pond': ['duck鴨', 'frog青蛙', 'tortoise龜'],
       'picnic-shop': ['home家', 'shop商店', 'burger漢堡', 'park公園'],
       'picnic-spread': ['home家', 'car小車', 'park公園', 'picnic野餐'],
       'delivery-short': ['truck貨車', 'parcel包裹', 'home家', 'park公園'],
+      'farm-visit': ['kid小朋友', 'dog狗', 'chicken雞', 'chick小雞'],
+      'farm-barn': ['dog狗', 'sheep羊', 'pig豬', 'cow牛'],
       'picnic-full': ['home家', 'car小車', 'shop商店', 'park公園', 'picnic野餐'],
       'picnic-burger': ['home家', 'burger漢堡', 'car小車', 'park公園', 'picnic野餐'],
       'delivery-day': ['truck貨車', 'parcel包裹', 'shop商店', 'home家', 'park公園'],
+      'farm-day': ['kid小朋友', 'dog狗', 'sheep羊', 'cow牛', 'horse馬'],
+      'farm-yard': ['cat貓', 'chicken雞', 'duck鴨', 'frog青蛙', 'bird鳥'],
     };
 
     for (const story of EASY_STORIES) expect(story.steps).toHaveLength(3);
     for (const story of BASIC_STORIES) expect(story.steps).toHaveLength(4);
     for (const story of PUZZLE_STORIES) expect(story.steps).toHaveLength(5);
+    const farmStoryIds = new Set([
+      'farm-pets', 'farm-pond', 'farm-visit', 'farm-barn', 'farm-day', 'farm-yard',
+    ]);
+    const kidFarmStories = new Set(['farm-visit', 'farm-day']);
     for (const story of SEQUENCE_STORIES) {
       expect(story.steps.map((step) => `${step.sprite}${step.label}`)).toEqual(expected[story.id]);
       expect(new Set(story.steps.map((step) => step.sprite)).size).toBe(story.steps.length);
       for (const step of story.steps) {
         expect(sprites).toHaveProperty(step.sprite);
+        if (farmStoryIds.has(story.id)) {
+          if (step.sprite === 'kid') expect(kidFarmStories.has(story.id)).toBe(true);
+          else expect(sprites[step.sprite].atlas).toBe('farm');
+        }
       }
     }
   });
@@ -138,6 +161,28 @@ describe('sequence deal and anti-repeat', () => {
     const basic = dealSequence(311, 1, recent);
     expect(basic.steps).toHaveLength(4);
     expect(BASIC_STORIES.some((story) => story.id === basic.id)).toBe(true);
+  });
+
+  it('deals farm stories across bands and keeps easy consecutive deals distinct', () => {
+    const deals = Array.from({ length: 24 }, (_, seed) => {
+      const level = seed % 3 === 0 ? 0 : seed % 3 === 1 ? 1 : 8;
+      return dealSequence(seed + 10, level);
+    });
+    expect(deals.length).toBeGreaterThanOrEqual(8);
+    expect(deals.some((deal) => deal.id.startsWith('farm-'))).toBe(true);
+
+    let recent: SequenceStoryId[] = [];
+    const easyIds: SequenceStoryId[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      const deal = dealSequence(1000 + i * 31, 0, recent);
+      easyIds.push(deal.id);
+      recent = rollRecentStories(recent, deal.id);
+    }
+    expect(easyIds).toHaveLength(5);
+    expect(new Set(easyIds).size).toBeGreaterThan(1);
+    for (let i = 1; i < easyIds.length; i += 1) {
+      expect(easyIds[i]).not.toBe(easyIds[i - 1]);
+    }
   });
 });
 

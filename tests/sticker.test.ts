@@ -28,11 +28,12 @@ const claims = /貼紙冊|100 枚|智商|智力|大腦/;
 
 describe('sticker word list and deal', () => {
   it('uses existing sprites, including hyphenated ids mapped to English words', () => {
-    expect(WORD_IDS).toHaveLength(16);
+    expect(WORD_IDS).toHaveLength(24);
     expect([...WORD_IDS]).toEqual([
       'burger', 'car', 'home', 'tree', 'flower', 'sun',
       'truck', 'parcel', 'bear', 'shop', 'park', 'picnic',
       'kid', 'tooth', 'toothbrush', 'bug-coral',
+      'dog', 'cat', 'chicken', 'duck', 'cow', 'pig', 'sheep', 'horse',
     ]);
     for (const extra of ['car-top', 'truck-top', 'kid-cheer', 'courier', 'bug-purple'] as const) {
       expect(WORD_IDS).not.toContain(extra);
@@ -45,13 +46,29 @@ describe('sticker word list and deal', () => {
     }
     expect(WORD_EN['bug-coral']).toBe('bug');
     expect(WORD_ZH['bug-coral']).toBe('蟲');
+    expect(WORD_ZH.dog).toBe('狗');
+    expect(WORD_EN.dog).toBe('dog');
+    expect(WORD_ZH.cat).toBe('貓');
+    expect(WORD_EN.cat).toBe('cat');
+    expect(WORD_ZH.chicken).toBe('雞');
+    expect(WORD_EN.chicken).toBe('chicken');
+    expect(WORD_ZH.duck).toBe('鴨');
+    expect(WORD_EN.duck).toBe('duck');
+    expect(WORD_ZH.cow).toBe('牛');
+    expect(WORD_EN.cow).toBe('cow');
+    expect(WORD_ZH.pig).toBe('豬');
+    expect(WORD_EN.pig).toBe('pig');
+    expect(WORD_ZH.sheep).toBe('羊');
+    expect(WORD_EN.sheep).toBe('sheep');
+    expect(WORD_ZH.horse).toBe('馬');
+    expect(WORD_EN.horse).toBe('horse');
     expect(new Set(Object.values(WORD_EN)).size).toBe(WORD_IDS.length);
   });
 
   it('nests load-band pools as easy ⊂ basic ⊂ puzzle = WORD_IDS', () => {
     expect(EASY_POOL).toHaveLength(8);
-    expect(BASIC_POOL).toHaveLength(12);
-    expect(PUZZLE_POOL).toHaveLength(16);
+    expect(BASIC_POOL).toHaveLength(16);
+    expect(PUZZLE_POOL).toHaveLength(24);
     expect(STICKER_POOL.easy).toEqual(EASY_POOL);
     expect(STICKER_POOL.basic).toEqual(BASIC_POOL);
     expect(STICKER_POOL.puzzle).toEqual(PUZZLE_POOL);
@@ -59,8 +76,12 @@ describe('sticker word list and deal', () => {
     expect(BASIC_POOL.every((id) => PUZZLE_POOL.includes(id))).toBe(true);
     expect(new Set(PUZZLE_POOL)).toEqual(new Set(WORD_IDS));
     expect([...EASY_POOL]).toEqual(['sun', 'car', 'home', 'tree', 'flower', 'bear', 'kid', 'park']);
-    expect(BASIC_POOL.filter((id) => !EASY_POOL.includes(id))).toEqual(['burger', 'shop', 'truck', 'picnic']);
-    expect(PUZZLE_POOL.filter((id) => !BASIC_POOL.includes(id))).toEqual(['parcel', 'tooth', 'toothbrush', 'bug-coral']);
+    expect(BASIC_POOL.filter((id) => !EASY_POOL.includes(id))).toEqual([
+      'burger', 'shop', 'truck', 'picnic', 'dog', 'cat', 'chicken', 'duck',
+    ]);
+    expect(PUZZLE_POOL.filter((id) => !BASIC_POOL.includes(id))).toEqual([
+      'parcel', 'tooth', 'toothbrush', 'bug-coral', 'cow', 'pig', 'sheep', 'horse',
+    ]);
     for (const extra of ['car-top', 'truck-top', 'kid-cheer', 'courier', 'bug-purple'] as const) {
       expect(PUZZLE_POOL).not.toContain(extra);
     }
@@ -96,17 +117,22 @@ describe('sticker word list and deal', () => {
     const seenTray = new Set(Array.from({ length: 24 }, (_, seed) => dealBoard(seed, 8).tray.join(',')));
     expect(seenTray.size).toBeGreaterThan(1);
 
-    const laterTheme = ['burger', 'shop', 'truck', 'picnic', 'parcel', 'tooth', 'toothbrush', 'bug-coral'] as const;
+    const laterTheme = [
+      'burger', 'shop', 'truck', 'picnic', 'parcel', 'tooth', 'toothbrush', 'bug-coral',
+      'dog', 'cat', 'chicken', 'duck', 'cow', 'pig', 'sheep', 'horse',
+    ] as const;
     const easySeen = new Set(Array.from({ length: 48 }, (_, seed) => dealBoard(seed, 0).slots).flat());
     expect(laterTheme.every((id) => !easySeen.has(id))).toBe(true);
 
     const basicSeen = new Set(Array.from({ length: 80 }, (_, seed) => dealBoard(seed, 1).slots).flat());
     expect(basicSeen.has('burger') || basicSeen.has('shop')).toBe(true);
-    expect((['parcel', 'tooth', 'toothbrush', 'bug-coral'] as const).every((id) => !basicSeen.has(id))).toBe(true);
+    expect(['dog', 'cat', 'chicken', 'duck'].some((id) => basicSeen.has(id))).toBe(true);
+    expect((['parcel', 'tooth', 'toothbrush', 'bug-coral', 'cow', 'pig', 'sheep', 'horse'] as const).every((id) => !basicSeen.has(id))).toBe(true);
 
     const puzzleSeen = new Set(Array.from({ length: 80 }, (_, seed) => dealBoard(seed, 8).slots).flat());
     expect(puzzleSeen.has('toothbrush')).toBe(true);
     expect(puzzleSeen.has('bug-coral')).toBe(true);
+    expect(['cow', 'pig', 'sheep', 'horse'].some((id) => puzzleSeen.has(id))).toBe(true);
     const laterPuzzle = new Set(Array.from({ length: 40 }, (_, seed) => dealBoard(seed, 9).slots).flat());
     expect(laterPuzzle.has('toothbrush') || laterPuzzle.has('bug-coral')).toBe(true);
   });

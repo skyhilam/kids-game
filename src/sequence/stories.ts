@@ -19,12 +19,18 @@ export type SequenceStoryId =
   | 'picnic-basic'
   | 'drive-park'
   | 'kid-brush'
+  | 'farm-pets'
+  | 'farm-pond'
   | 'picnic-shop'
   | 'picnic-spread'
   | 'delivery-short'
+  | 'farm-visit'
+  | 'farm-barn'
   | 'picnic-full'
   | 'picnic-burger'
-  | 'delivery-day';
+  | 'delivery-day'
+  | 'farm-day'
+  | 'farm-yard';
 
 export type SequenceStory = {
   id: SequenceStoryId;
@@ -58,6 +64,14 @@ export const EASY_STORIES: readonly SequenceStory[] = [
     id: 'kid-brush',
     steps: [step('kid', '小朋友'), step('toothbrush', '牙刷'), step('tooth', '牙齒')],
   },
+  {
+    id: 'farm-pets',
+    steps: [step('dog', '狗'), step('cat', '貓'), step('rabbit', '兔')],
+  },
+  {
+    id: 'farm-pond',
+    steps: [step('duck', '鴨'), step('frog', '青蛙'), step('tortoise', '龜')],
+  },
 ];
 
 export const BASIC_STORIES: readonly SequenceStory[] = [
@@ -72,6 +86,14 @@ export const BASIC_STORIES: readonly SequenceStory[] = [
   {
     id: 'delivery-short',
     steps: [step('truck', '貨車'), step('parcel', '包裹'), step('home', '家'), step('park', '公園')],
+  },
+  {
+    id: 'farm-visit',
+    steps: [step('kid', '小朋友'), step('dog', '狗'), step('chicken', '雞'), step('chick', '小雞')],
+  },
+  {
+    id: 'farm-barn',
+    steps: [step('dog', '狗'), step('sheep', '羊'), step('pig', '豬'), step('cow', '牛')],
   },
 ];
 
@@ -104,6 +126,26 @@ export const PUZZLE_STORIES: readonly SequenceStory[] = [
       step('shop', '商店'),
       step('home', '家'),
       step('park', '公園'),
+    ],
+  },
+  {
+    id: 'farm-day',
+    steps: [
+      step('kid', '小朋友'),
+      step('dog', '狗'),
+      step('sheep', '羊'),
+      step('cow', '牛'),
+      step('horse', '馬'),
+    ],
+  },
+  {
+    id: 'farm-yard',
+    steps: [
+      step('cat', '貓'),
+      step('chicken', '雞'),
+      step('duck', '鴨'),
+      step('frog', '青蛙'),
+      step('bird', '鳥'),
     ],
   },
 ];

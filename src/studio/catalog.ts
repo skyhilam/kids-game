@@ -2,7 +2,7 @@ import type { SpriteName } from '../art/sprites';
 import { generateMaze } from '../game/generate';
 import { generateDeliveryMission } from '../delivery/generate';
 import { deliveryLoadBand, mazeLoadBand, stickerLoadBand, STAGE_LABEL } from '../game/stages';
-import { stickerWordCount, WORD_IDS } from '../sticker/words';
+import { stickerWordCount, WORD_IDS, type WordId } from '../sticker/words';
 
 export const models = {
   car: { label: '小車', group: 'vehicle' },
@@ -34,7 +34,12 @@ export const kits = {
   picnic: { title: '一起去野餐', short: '野餐小路', icon: 'car', sprites: ['car', 'car-top', 'burger', 'home', 'shop', 'tree', 'flower', 'sun', 'park', 'picnic-place', 'picnic', 'bear'] },
   tooth: { title: '打敗蛀牙蟲', short: '刷牙冒險', icon: 'tooth', sprites: ['kid', 'kid-cheer', 'tooth', 'toothbrush', 'bug-coral', 'bug-purple'] },
   delivery: { title: '送貨員來了', short: '送貨任務', icon: 'truck', sprites: ['truck', 'truck-top', 'parcel', 'courier', 'home', 'tree', 'flower', 'sun'] },
-  sticker: { title: '貼紙學單字', short: '單字貼紙', icon: 'flower', sprites: WORD_IDS },
+  sticker: {
+    title: '貼紙學單字',
+    short: '單字貼紙',
+    icon: 'flower',
+    sprites: WORD_IDS.filter((id): id is WordId & ModelName => Object.hasOwn(models, id)),
+  },
 } as const satisfies Record<string, { title: string; short: string; icon: ModelName; sprites: readonly ModelName[] }>;
 export type GameKind = keyof typeof kits;
 export type StudioContext = { game: GameKind; level: number };
