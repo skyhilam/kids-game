@@ -105,6 +105,7 @@ const { onPointerDown, onPointerUp, onPointerCancel } = useBoardInput({
       class="board"
       :id="boardId"
       :class="{ moving: !!inFlight }"
+      :data-path-ready="interactive && links.length > 0 ? 'true' : 'false'"
       :style="{ aspectRatio: `${size.width} / ${size.height}` }"
       @pointerdown="onPointerDown"
       @pointerup="onPointerUp"
