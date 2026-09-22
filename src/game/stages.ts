@@ -35,6 +35,21 @@ export function stageLabel(band: LoadBand): string {
   return STAGE_LABEL[band];
 }
 
+/**
+ * In-play stage sentence: `第 N 關 · 簡單|基礎|益智 · done / total`.
+ * Sequence passes `filled / steps.length`; sticker passes `matched / words.length`.
+ * The visible badge and `data-stage-chip` use this string; `data-stage` stays the Chinese label.
+ */
+export const STAGE_CHIP_SENTENCE = /^第 \d+ 關 · (簡單|基礎|益智) · \d+ \/ \d+$/;
+
+export function formatStageChip(input: {
+  levelIndex: number;
+  band: LoadBand;
+  progress: string;
+}): string {
+  return `第 ${input.levelIndex + 1} 關 · ${STAGE_LABEL[input.band]} · ${input.progress}`;
+}
+
 /** Same picnic/brush bands: 0 easy, 1–7 basic, 8+ puzzle. */
 export function stickerLoadBand(index = 0): LoadBand {
   return mazeLoadBand(index);
