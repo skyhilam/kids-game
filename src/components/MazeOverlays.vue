@@ -37,12 +37,14 @@ const revealMs = computed(() => {
   if (props.overlay?.kind !== 'win') return 0;
   return props.reduceMotion ? 100 : 650;
 });
+const winBeat = computed(() => props.overlay?.kind === 'win');
 </script>
 
 <template>
   <MazeDialog
     :open="overlay !== null"
     :reveal-ms="revealMs"
+    :win-beat="winBeat"
     :cancelable="cancelable"
     @close="emit('close')"
     @revealed="emit('revealed')"

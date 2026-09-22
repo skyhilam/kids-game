@@ -514,7 +514,11 @@ describe('dialog wiring', () => {
     expect(host).toMatch(/if \(props\.cancelable\) emit\('close'\)/);
     expect(host).toMatch(/querySelector<HTMLElement>\('\[autofocus\]'\)/);
     expect(host).toMatch(/if \(props\.revealMs > 0\)/);
-    expect(host).toMatch(/openDialog\(\);\s*emit\('revealed'\)/);
+    expect(host).toMatch(/openDialog\(true\)/);
+    expect(host).toMatch(/dialog\.showModal\(\)[\s\S]*?emit\('revealed'\)/);
+    expect(host).toMatch(/data-win-ready/);
+    expect(host).toMatch(/aria-busy/);
+    expect(host).not.toMatch(/showModal\(\);\s*emit\('revealed'\)/);
     expect(host).toMatch(/if \(!open\) \{\s*hideDialog\(\);/);
     expect(host).toMatch(/returnFocus\.isConnected/);
     expect(host).toMatch(/'disabled' in returnFocus && returnFocus\.disabled/);
