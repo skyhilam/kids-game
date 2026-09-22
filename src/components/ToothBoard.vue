@@ -38,6 +38,7 @@ function targetClass(to: NodeId): string {
     :hint-node="hintNode"
     :in-flight="inFlight"
     board-label="刷牙路線遊戲"
+    board-id="board"
     frame-class="tooth-board"
     :roads="roads"
     :aria-for="ariaFor"

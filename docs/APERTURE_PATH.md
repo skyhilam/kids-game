@@ -27,10 +27,12 @@
 
 ## 名稱（L1）
 
+產品用 `picnicCatalog` / `toothCatalog`（產生器），起點光圈名稱隨種子變。固定 `LEVELS` / `TOOTH_LEVELS` 教學圖上：
+
 - 野餐（預設方向前綴）：起點唯一光圈是 **「向下前往路口」**（`向{向}前往{路口}`）。
 - 刷牙（`ToothBoard` 覆寫、無方向）：起點唯一光圈是 **「前往路口」**。
 
-點完第一格後會再出現下一組（野餐常是「向…前往漢堡店」；刷牙是「前往終點」與「前往蛀牙蟲」等）。跟 hint / 解法走即可；過關後改等 `docs/WIN_READY.md` 的 `[data-win-ready="true"]`。
+CUA 甲 dump 的 `path=['向下前往路口']` / `['前往路口']` 對得上這套命名。點完第一格後會再出現下一組。跟 hint / 解法走即可；過關後改等 `docs/WIN_READY.md` 的 `[data-win-ready="true"]`。
 
 ## 劇本（自動化）
 

@@ -9,9 +9,9 @@ import { moveDuration } from '../src/game/motion';
 import { available, createGame, findSolution } from '../src/game/rules';
 import type { GameState, Graph, InFlightMove, NodeId } from '../src/game/types';
 import { NODE_LABELS as PICNIC_LABELS, sessionCopy as picnicSessionCopy } from '../src/picnic/copy';
-import { LEVELS } from '../src/picnic/levels';
+import { LEVELS, picnicLevel } from '../src/picnic/levels';
 import { NODE_LABELS as TOOTH_LABELS, sessionCopy as toothSessionCopy } from '../src/tooth/copy';
-import { TOOTH_LEVELS } from '../src/tooth/levels';
+import { TOOTH_LEVELS, toothLevel } from '../src/tooth/levels';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -222,6 +222,55 @@ describe('甲 aperture / clear-path (picnic + tooth)', () => {
         expect(session.overlay.value).toEqual({ kind: 'win' });
       }
     });
+
+    it('generated catalog L1 also empties during flight then clears', () => {
+      for (const [label, catalog, copy] of [
+        ['picnic-gen', picnicLevel, picnicSessionCopy] as const,
+        ['tooth-gen', toothLevel, toothSessionCopy] as const,
+      ]) {
+        const session = useGameSession({}, { catalog: (index) => catalog(index, 1), copy });
+        session.applyLayout(true);
+        expect(session.welcomeStart()).toBe(true);
+        const first = available(session.graph.value, session.game.node, session.game.used);
+        expect(first.length, label).toBeGreaterThan(0);
+        expect(session.requestMove(first[0]!.to).ok).toBe(true);
+        expect(session.interactive.value).toBe(false);
+        flushFrames();
+        expect(session.interactive.value).toBe(true);
+        for (let i = 0; i < 32; i += 1) {
+          if (session.game.won || session.overlay.value?.kind === 'stuck') break;
+          const path = findSolution(
+            session.graph.value,
+            session.game.node,
+            session.game.collected,
+            session.game.used,
+          );
+          if (!path?.length) {
+            expect(session.requestHint()).toMatch(/hint|rescue/);
+            if (session.overlay.value?.kind === 'rescue') session.retry();
+            continue;
+          }
+          expect(session.requestMove(path[0]!).ok).toBe(true);
+          flushFrames();
+        }
+        if (session.overlay.value?.kind === 'stuck') {
+          expect(session.retry()).toBe(true);
+        }
+        for (let i = 0; i < 32 && !session.game.won; i += 1) {
+          const path = findSolution(
+            session.graph.value,
+            session.game.node,
+            session.game.collected,
+            session.game.used,
+          );
+          expect(path, label).not.toBeNull();
+          if (!path?.length) break;
+          expect(session.requestMove(path[0]!).ok).toBe(true);
+          flushFrames();
+        }
+        expect(session.game.won, label).toBe(true);
+      }
+    });
   });
 
   it('P4 documents the path-ready playbook beside win-ready', () => {
@@ -233,5 +282,7 @@ describe('甲 aperture / clear-path (picnic + tooth)', () => {
     expect(doc).toContain('WIN_READY');
     const board = read('src/components/MazeBoard.vue');
     expect(board).toContain('data-path-ready');
+    expect(read('src/components/ToothBoard.vue')).toContain('board-id="board"');
+    expect(read('src/components/PicnicBoard.vue')).toContain('board-id="board"');
   });
 });
