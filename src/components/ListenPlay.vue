@@ -378,7 +378,7 @@ onUnmounted(() => {
             <p>{{ copy.parent[stageBand] }}</p>
           </article>
         </div>
-        <ParentGuide :guide="guide" :stage-label="stageLabel"/>
+        <ParentGuide collapsible :guide="guide" :stage-label="stageLabel"/>
         <button class="primary-button help-finish" type="button" autofocus @click="closeHelp">
           返回遊戲<svg><use href="#i-arrow"/></svg>
         </button>
