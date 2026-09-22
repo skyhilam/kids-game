@@ -2,6 +2,8 @@
 
 野餐與刷牙共用 `MazePlay` → `MazeOverlays` → `MazeDialog`。過關後角色先走完，卡片才打開。這段等待要留著。
 
+走路途中光圈會暫時消失：見 `docs/APERTURE_PATH.md`（等 `data-path-ready`，不要在 TAP 後立刻要求下一圈）。
+
 對齊 PR #14 **verdict B**：不要縮短 settle 或 `moveDuration`，也不要提早 `showModal`。提早打開（scheme C）要先問產品，這裡不做。
 
 ## 鉤子
