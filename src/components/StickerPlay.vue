@@ -3,7 +3,7 @@ import { computed, onUnmounted, reactive, ref } from 'vue';
 import { usePlayAudio } from '../composables/usePlayAudio';
 import { cancelSpeech, initAudio, playCue, speakEnglish } from '../game/audio';
 import { randomSeed } from '../game/rng';
-import { parentCopy, STAGE_LABEL, stickerLoadBand } from '../game/stages';
+import { formatStageChip, parentCopy, STAGE_LABEL, stickerLoadBand } from '../game/stages';
 import { STICKER_COPY as copy } from '../sticker/copy';
 import {
   dealBoard,
@@ -54,6 +54,11 @@ const drag = ref<{
 } | null>(null);
 
 const matched = computed(() => placedCount(placed, words.value));
+const stageChip = computed(() => formatStageChip({
+  levelIndex: level.value,
+  band: stageBand.value,
+  progress: `${matched.value} / ${words.value.length}`,
+}));
 const playing = computed(() => overlay.value === null);
 const slotColumns = computed(() => words.value.length === 4 ? 2 : 3);
 const trayColumns = computed(() => words.value.length);
@@ -265,9 +270,7 @@ onUnmounted(() => {
         </div>
       </div>
       <div class="level-badge">
-        <span>第 {{ level + 1 }} 關</span>
-        <span class="stage-chip" :data-stage="stageLabel">{{ stageLabel }}</span>
-        <span>{{ matched }} / {{ words.length }}</span>
+        <span class="stage-chip" :data-stage="stageLabel" :data-stage-chip="stageChip">{{ stageChip }}</span>
       </div>
     </section>
 
@@ -339,7 +342,7 @@ onUnmounted(() => {
         <div class="guide-avatar" aria-hidden="true"><GameSprite name="bear"/></div>
         <div class="guide-copy">
           <div class="guide-main" role="status" aria-live="polite">{{ message }}</div>
-          <div class="guide-sub">第 {{ level + 1 }} 關 · {{ stageLabel }}。{{ copy.guideSub }}</div>
+          <div class="guide-sub">{{ stageChip }}。{{ copy.guideSub }}</div>
         </div>
       </div>
     </section>

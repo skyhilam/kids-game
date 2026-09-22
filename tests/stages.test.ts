@@ -3,8 +3,10 @@ import { generateDeliveryMission } from '../src/delivery/generate';
 import { DELIVERY_MISSION } from '../src/delivery/mission';
 import {
   deliveryLoadBand,
+  formatStageChip,
   mazeLoadBand,
   parentCopy,
+  STAGE_CHIP_SENTENCE,
   STAGE_LABEL,
   STAGE_OVERVIEW,
   STAGE_PICK_INTRO,
@@ -82,5 +84,22 @@ describe('generator load bands and parent copy', () => {
     expect(parentCopy.sequence.easy.goal).not.toBe(parentCopy.sequence.basic.goal);
     expect(parentCopy.sequence.basic.ask).not.toBe(parentCopy.sequence.puzzle.ask);
     expect(JSON.stringify({ parentCopy, STAGE_PICK_INTRO })).not.toMatch(claims);
+  });
+
+  it('formats the shared stage-chip sentence without moving load bands', () => {
+    expect(formatStageChip({ levelIndex: 0, band: 'easy', progress: '0 / 3' })).toBe('第 1 關 · 簡單 · 0 / 3');
+    expect(formatStageChip({ levelIndex: 1, band: 'basic', progress: '0 / 4' })).toBe('第 2 關 · 基礎 · 0 / 4');
+    expect(formatStageChip({ levelIndex: 8, band: 'puzzle', progress: '2 / 5' })).toBe('第 9 關 · 益智 · 2 / 5');
+    expect(formatStageChip({ levelIndex: 0, band: stickerLoadBand(0), progress: '0 / 4' })).toBe('第 1 關 · 簡單 · 0 / 4');
+    expect(formatStageChip({ levelIndex: 1, band: sequenceLoadBand(1), progress: '1 / 4' })).toBe('第 2 關 · 基礎 · 1 / 4');
+    for (const band of ['easy', 'basic', 'puzzle'] as const) {
+      const sentence = formatStageChip({ levelIndex: 0, band, progress: '0 / 3' });
+      expect(sentence).toMatch(STAGE_CHIP_SENTENCE);
+      expect(sentence.match(STAGE_CHIP_SENTENCE)?.[1]).toBe(STAGE_LABEL[band]);
+    }
+    expect(mazeLoadBand(0)).toBe('easy');
+    expect(mazeLoadBand(1)).toBe('basic');
+    expect(stickerLoadBand(1)).toBe(mazeLoadBand(1));
+    expect(sequenceLoadBand(8)).toBe(mazeLoadBand(8));
   });
 });

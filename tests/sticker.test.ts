@@ -291,6 +291,9 @@ describe('sticker stages, copy, and hub wiring', () => {
     expect(play).toContain('copy.parent[stageBand]');
     expect(play).toMatch(/第 \{\{ level \+ 1 \}\} 關/);
     expect(play).toContain(':data-stage="stageLabel"');
+    expect(play).toContain('formatStageChip');
+    expect(play).toContain('`${matched.value} / ${words.value.length}`');
+    expect(play).toContain(':data-stage-chip="stageChip"');
     expect(play).toContain('speakEnglish');
     expect(play).toContain('WORD_EN');
     expect(play).toContain("playCue(soundOn.value, 'collect')");

@@ -305,7 +305,9 @@ describe('sequence copy, parent guide, and hub card', () => {
     expect(play).toContain('parentCopy.sequence');
     expect(play).toContain('copy.parent[stageBand]');
     expect(play).toMatch(/第 \{\{ level \+ 1 \}\} 關/);
-    expect(play).toContain('{{ filled }} / {{ board.steps.length }}');
+    expect(play).toContain('formatStageChip');
+    expect(play).toContain('`${filled.value} / ${board.value.steps.length}`');
+    expect(play).toContain(':data-stage-chip="stageChip"');
     expect(play).toContain('@click="onTrayTap(step.sprite)"');
     expect(play).toContain('@click="onSlotTap(index)"');
     expect(play).not.toMatch(/pointerdown|pointermove|sticker-float|draggable|@drag/);

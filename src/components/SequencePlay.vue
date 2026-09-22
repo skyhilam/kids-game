@@ -4,7 +4,7 @@ import type { SpriteName } from '../art/sprites';
 import { usePlayAudio } from '../composables/usePlayAudio';
 import { initAudio, playCue } from '../game/audio';
 import { randomSeed } from '../game/rng';
-import { parentCopy, sequenceLoadBand, STAGE_LABEL } from '../game/stages';
+import { formatStageChip, parentCopy, sequenceLoadBand, STAGE_LABEL } from '../game/stages';
 import { SEQUENCE_COPY as copy } from '../sequence/copy';
 import {
   dealSequence,
@@ -44,6 +44,11 @@ const stageBand = computed(() => sequenceLoadBand(level.value));
 const stageLabel = computed(() => STAGE_LABEL[stageBand.value]);
 const guide = computed(() => parentCopy.sequence[stageBand.value]);
 const filled = computed(() => filledCount(slots.value));
+const stageChip = computed(() => formatStageChip({
+  levelIndex: level.value,
+  band: stageBand.value,
+  progress: `${filled.value} / ${board.value.steps.length}`,
+}));
 const playing = computed(() => overlay.value === null);
 const slotColumns = computed(() => board.value.steps.length);
 
@@ -198,9 +203,7 @@ onUnmounted(() => {
         </div>
       </div>
       <div class="level-badge">
-        <span>第 {{ level + 1 }} 關</span>
-        <span class="stage-chip" :data-stage="stageLabel">{{ stageLabel }}</span>
-        <span>{{ filled }} / {{ board.steps.length }}</span>
+        <span class="stage-chip" :data-stage="stageLabel" :data-stage-chip="stageChip">{{ stageChip }}</span>
       </div>
     </section>
 
@@ -273,7 +276,7 @@ onUnmounted(() => {
         <div class="guide-avatar" aria-hidden="true"><GameSprite name="car"/></div>
         <div class="guide-copy">
           <div class="guide-main" role="status" aria-live="polite">{{ message }}</div>
-          <div class="guide-sub">第 {{ level + 1 }} 關 · {{ stageLabel }} · {{ filled }} / {{ board.steps.length }}。{{ copy.guideSub }}</div>
+          <div class="guide-sub">{{ stageChip }}。{{ copy.guideSub }}</div>
         </div>
       </div>
     </section>
