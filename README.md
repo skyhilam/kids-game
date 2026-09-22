@@ -72,7 +72,7 @@ iPad／iPhone：用 **Safari** 打開上面網址即可。按分享鈕 →「加
 
 Vue 3 + TypeScript + Vite，遊戲畫面由 Phaser 4 繪製（官方 Vue＋TypeScript＋Vite 整合方式：`PhaserGame.vue` 橋接、EventBus、Scene）。素材工房、API token 與完成紀錄繼續用 Vue；關卡生成、路線規則與勝負判定沿用 `src/game/` TypeScript。繪本 PNG 與工房動作影格接入 Phaser 動畫（FPS、循環、暫停、`animationcomplete`）；待機／開車／歡呼的切換條件在 `src/game/playerAction.ts`。各款遊戲共用插畫素材庫，由 `src/art/sprites.ts` 登記；Vue 介面仍透過 `GameSprite.vue` 顯示選單與對話框插畫。新增遊戲可直接重用角色、場景和道具，詳見 [共用素材使用說明](src/art/README.md)；參考照片的逐張處理狀態見 [處理紀錄](src/art/reference-progress.json)。箭頭、音量等介面符號保留為可變色的 SVG。
 支援觸控、滑鼠、方向鍵，響應式手機／平板版面及減少動態效果設定。棋盤上方保留 HTML 目標按鈕以維持鍵盤與讀屏操作。
-野餐與刷牙共用無向迷宮規則（`src/game/`）；關卡與文案分屬 `src/picnic/` 與 `src/tooth/`。送貨為獨立路線任務。可用 `npm test` 驗證。
+野餐與刷牙共用無向迷宮規則（`src/game/`）；關卡與文案分屬 `src/picnic/` 與 `src/tooth/`。過關卡片會等角色走完再打開（一般 650ms，減少動態 100ms）。自動檢查請等 `data-win-ready="true"`，見 [通關等待](docs/WIN_READY.md)。送貨為獨立路線任務。可用 `npm test` 驗證。
 公開 repo 嘅 `main` 已禁止 force-push／刪除分支，Wiki 關閉。
 
 本機開發：

@@ -12,6 +12,10 @@ import { toothLevel } from '../src/tooth/levels';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+function read(path: string): string {
+  return readFileSync(join(root, path), 'utf8');
+}
+
 function goalClearance(kind: 'tooth' | 'picnic', index: number, seed: number, narrow: boolean, board: { w: number; h: number }, button: number) {
   const level = kind === 'tooth' ? toothLevel(index, seed) : picnicLevel(index, seed);
   const labels = kind === 'tooth' ? TOOTH_LABELS : PICNIC_LABELS;
@@ -51,9 +55,14 @@ function goalClearance(kind: 'tooth' | 'picnic', index: number, seed: number, na
 
 describe('tooth/picnic win overlay detection window', () => {
   it('keeps the open dialog later than a short poll on long final edges', () => {
-    const overlays = readFileSync(join(root, 'src/components/MazeOverlays.vue'), 'utf8');
+    const overlays = read('src/components/MazeOverlays.vue');
+    const dialog = read('src/components/MazeDialog.vue');
     const reveal = overlays.match(/props\.reduceMotion \? 100 : (\d+)/);
     expect(reveal?.[1]).toBe('650');
+    expect(overlays).toMatch(/winBeat/);
+    expect(dialog).toMatch(/data-win-ready/);
+    expect(dialog).toMatch(/aria-busy/);
+    expect(dialog).toMatch(/Do not call showModal early/);
     const winRevealMs = Number(reveal?.[1]);
     const shortEdge = moveDuration(1, false);
     const longEdge = moveDuration(10_000, false);
