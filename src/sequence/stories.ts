@@ -35,12 +35,15 @@ export type SequenceStoryId =
 export type SequenceStory = {
   id: SequenceStoryId;
   steps: readonly SequenceStep[];
+  /** Fixed tray narration. Set when the pictures alone do not lock the order. */
+  narration?: string;
 };
 
 export type SequenceDeal = {
   id: SequenceStoryId;
   steps: readonly SequenceStep[];
   tray: SequenceStep[];
+  narration?: string;
 };
 
 export type SequenceSlots = Array<SpriteName | null>;
@@ -89,7 +92,9 @@ export const BASIC_STORIES: readonly SequenceStory[] = [
   },
   {
     id: 'farm-visit',
-    steps: [step('kid', '小朋友'), step('dog', '狗'), step('chicken', '雞'), step('chick', '小雞')],
+    // 語意 v2：雞媽媽先帶路 → 小雞跟住 → 去到水邊先見鴨 → 再見到青蛙。
+    narration: '雞媽媽先帶路，小雞跟住媽媽，去到水邊先見鴨，再見到青蛙。',
+    steps: [step('chicken', '雞'), step('chick', '小雞'), step('duck', '鴨'), step('frog', '青蛙')],
   },
   {
     id: 'farm-barn',
@@ -238,5 +243,6 @@ export function dealSequence(
     id: chosen.id,
     steps: chosen.steps,
     tray: shuffle(rand, chosen.steps),
+    ...(chosen.narration ? { narration: chosen.narration } : {}),
   };
 }

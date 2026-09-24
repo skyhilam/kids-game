@@ -25,11 +25,16 @@ import ParentGuide from './ParentGuide.vue';
 import PlayChrome from './PlayChrome.vue';
 
 const emit = defineEmits<{ home: [] }>();
+const props = defineProps<{
+  /** Optional fixed opening deal. The live game omits both. */
+  openingSeed?: number;
+  openingLevel?: number;
+}>();
 const { soundOn, toastText, toastOn, toast, toggleSound } = usePlayAudio();
 
 const overlay = ref<'welcome' | 'help' | 'win' | null>('welcome');
-const level = ref(0);
-const board = ref<SequenceDeal>(dealSequence(randomSeed(), 0));
+const level = ref(props.openingLevel ?? 0);
+const board = ref<SequenceDeal>(dealSequence(props.openingSeed ?? randomSeed(), level.value));
 const recentStories = ref<SequenceStoryId[]>([board.value.id]);
 const slots = ref<SequenceSlots>(emptySlots(board.value.steps.length));
 const message = ref<string>(copy.guideMain);
@@ -241,10 +246,17 @@ onUnmounted(() => {
             </template>
           </button>
         </div>
+        <p
+          v-if="board.narration"
+          id="sequence-narration"
+          class="sequence-narration"
+          data-sequence-narration
+        >{{ board.narration }}</p>
         <div
           class="sequence-tray"
           role="list"
           :aria-label="copy.trayLabel"
+          :aria-describedby="board.narration ? 'sequence-narration' : undefined"
           :style="{ gridTemplateColumns: `repeat(${slotColumns}, minmax(0, 1fr))` }"
         >
           <div
@@ -380,6 +392,7 @@ onUnmounted(() => {
 .slot-index{position:absolute;top:8px;left:10px;width:22px;height:22px;border-radius:50%;background:#efe6d6;color:#7a6848;font-size:12px;font-weight:850;display:grid;place-items:center}
 .sequence-slot svg{width:84px;height:76px}
 .slot-label{font-size:15px;letter-spacing:.4px;color:#6a5a3e;font-weight:750}
+.sequence-narration{margin:0;padding:10px 14px;border-radius:16px;background:#fffdf8;border:1.5px solid #e4d3b0;color:#5c4a32;font-size:16px;font-weight:750;line-height:1.5;text-align:center;letter-spacing:.2px}
 .sequence-tray{display:grid;gap:8px;padding:10px;border-radius:20px;background:#fffdf8d9;border:1.5px solid #e8decc}
 .tray-slot{min-height:112px;border-radius:16px;background:#f7f0e4;display:grid;place-items:center}
 .tray-slot.empty{background:#f1eadc;border:1.5px dashed #ddd2be}
@@ -392,6 +405,7 @@ onUnmounted(() => {
 @media(max-width:700px){
   .board.sequence-board{min-height:0;padding:16px 12px 12px;gap:12px}
   .sequence-board .board-note{display:none}
+  .sequence-narration{font-size:13px;padding:8px 10px}
   .sequence-slots{flex:none;gap:8px}
   .sequence-slot{min-height:112px;border-radius:18px}
   .sequence-slot svg{width:56px;height:50px}
