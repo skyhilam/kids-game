@@ -83,7 +83,7 @@ describe('sequence bands, N, and stories', () => {
       'picnic-shop': ['home家', 'shop商店', 'burger漢堡', 'park公園'],
       'picnic-spread': ['home家', 'car小車', 'park公園', 'picnic野餐'],
       'delivery-short': ['truck貨車', 'parcel包裹', 'home家', 'park公園'],
-      'farm-visit': ['kid小朋友', 'dog狗', 'chicken雞', 'chick小雞'],
+      'farm-visit': ['chicken雞', 'chick小雞', 'duck鴨', 'frog青蛙'],
       'farm-barn': ['dog狗', 'sheep羊', 'pig豬', 'cow牛'],
       'picnic-full': ['home家', 'car小車', 'shop商店', 'park公園', 'picnic野餐'],
       'picnic-burger': ['home家', 'burger漢堡', 'car小車', 'park公園', 'picnic野餐'],
@@ -98,7 +98,7 @@ describe('sequence bands, N, and stories', () => {
     const farmStoryIds = new Set([
       'farm-pets', 'farm-pond', 'farm-visit', 'farm-barn', 'farm-day', 'farm-yard',
     ]);
-    const kidFarmStories = new Set(['farm-visit', 'farm-day']);
+    const kidFarmStories = new Set(['farm-day']);
     for (const story of SEQUENCE_STORIES) {
       expect(story.steps.map((step) => `${step.sprite}${step.label}`)).toEqual(expected[story.id]);
       expect(new Set(story.steps.map((step) => step.sprite)).size).toBe(story.steps.length);
@@ -110,6 +110,89 @@ describe('sequence bands, N, and stories', () => {
         }
       }
     }
+  });
+});
+
+const FARM_VISIT_NARRATION = '雞媽媽先帶路，小雞跟住媽媽，去到水邊先見鴨，再見到青蛙。';
+
+describe('farm-visit 語意 v2', () => {
+  it('orders chicken, chick, duck, then frog and keeps the duck-before-frog beat', () => {
+    const visit = BASIC_STORIES.find((story) => story.id === 'farm-visit');
+    expect(visit?.steps.map((step) => step.sprite)).toEqual(['chicken', 'chick', 'duck', 'frog']);
+    expect(visit?.steps.map((step) => step.label)).toEqual(['雞', '小雞', '鴨', '青蛙']);
+    expect(visit?.narration).toBe(FARM_VISIT_NARRATION);
+    const narration = visit?.narration ?? '';
+    for (const beat of ['雞媽媽先帶路', '小雞跟住媽媽', '去到水邊先見鴨', '再見到青蛙']) {
+      expect(narration).toContain(beat);
+    }
+    expect(narration.indexOf('去到水邊先見鴨')).toBeLessThan(narration.indexOf('再見到青蛙'));
+    expect(narration.indexOf('鴨')).toBeLessThan(narration.indexOf('青蛙'));
+
+    const spritesInStory = visit?.steps.map((step) => step.sprite) ?? [];
+    expect(spritesInStory).not.toContain('kid');
+    expect(spritesInStory).not.toContain('toothbrush');
+    expect(spritesInStory.every((name) => sprites[name].atlas === 'farm')).toBe(true);
+    expect(SEQUENCE_STORIES.filter((story) => story.narration).map((story) => story.id)).toEqual(['farm-visit']);
+  });
+
+  it('deals a four-animal farm tray and still judges wrong order as a soft miss', () => {
+    let seed = -1;
+    for (let candidate = 0; candidate < 2000; candidate += 1) {
+      if (dealSequence(candidate, 1).id === 'farm-visit') {
+        seed = candidate;
+        break;
+      }
+    }
+    expect(seed).toBeGreaterThanOrEqual(0);
+    const deal = dealSequence(seed, 1);
+    expect(deal.narration).toBe(FARM_VISIT_NARRATION);
+    expect(deal.tray.map((step) => step.sprite).sort()).toEqual(['chick', 'chicken', 'duck', 'frog']);
+    expect(deal.tray.some((step) => step.sprite === 'kid' || step.sprite === 'toothbrush')).toBe(false);
+
+    const story = deal.steps;
+    const correct = story.map((step) => step.sprite);
+    expect(correct.indexOf('duck')).toBeLessThan(correct.indexOf('frog'));
+    expect(judgeWhenFull(correct, story)).toBe('correct');
+    expect(isOrdered(correct, story)).toBe(true);
+
+    const wrongOrder = [...correct].reverse();
+    let slots = emptySlots(story.length);
+    for (const sprite of wrongOrder) slots = placeInLeftmost(slots, sprite);
+    expect(slots).toEqual(['frog', 'duck', 'chick', 'chicken']);
+    expect(judgeWhenFull(slots, story)).toBe('wrong');
+    expect(isFull(slots)).toBe(true);
+    expect(judgeWhenFull([...correct.slice(0, 3), null], story)).toBe('incomplete');
+
+    for (let index = 0; index < slots.length; index += 1) slots = removeFromSlot(slots, index);
+    expect(slots.every((slot) => slot === null)).toBe(true);
+    expect(judgeWhenFull(slots, story)).toBe('incomplete');
+    for (const sprite of correct) slots = placeInLeftmost(slots, sprite);
+    expect(judgeWhenFull(slots, story)).toBe('correct');
+  });
+
+  it('keeps farm-pond and farm-barn on their own orders', () => {
+    const pond = EASY_STORIES.find((story) => story.id === 'farm-pond');
+    const barn = BASIC_STORIES.find((story) => story.id === 'farm-barn');
+    expect(pond?.steps.map((step) => `${step.sprite}${step.label}`)).toEqual(['duck鴨', 'frog青蛙', 'tortoise龜']);
+    expect(pond?.narration).toBeUndefined();
+    expect(barn?.steps.map((step) => `${step.sprite}${step.label}`)).toEqual(['dog狗', 'sheep羊', 'pig豬', 'cow牛']);
+    expect(barn?.narration).toBeUndefined();
+    expect(judgeWhenFull(pond!.steps.map((step) => step.sprite), pond!.steps)).toBe('correct');
+    expect(judgeWhenFull(barn!.steps.map((step) => step.sprite), barn!.steps)).toBe('correct');
+    expect(judgeWhenFull(['frog', 'duck', 'tortoise'], pond!.steps)).toBe('wrong');
+  });
+
+  it('shows the tray narration from the deal and leaves the SequencePlay judge path unchanged', () => {
+    const play = readFileSync(join(root, 'src/components/SequencePlay.vue'), 'utf8');
+    expect(play).toContain('data-sequence-narration');
+    expect(play).toContain('{{ board.narration }}');
+    expect(play).toContain('judgeWhenFull(next, board.value.steps)');
+    expect(play).toContain('message.value = copy.wrong');
+    expect(play).toContain("playCue(soundOn.value, 'hint')");
+    expect(play).not.toContain('farm-visit');
+    const mobile = play.slice(play.indexOf('@media(max-width:700px)'));
+    expect(mobile).toContain('.sequence-narration{font-size:13px;padding:8px 10px}');
+    expect(mobile).not.toContain('.sequence-narration{display:none');
   });
 });
 
