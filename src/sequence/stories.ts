@@ -35,15 +35,15 @@ export type SequenceStoryId =
 export type SequenceStory = {
   id: SequenceStoryId;
   steps: readonly SequenceStep[];
-  /** Fixed tray narration. Set when the pictures alone do not lock the order. */
-  narration?: string;
+  /** Fixed tray narration shown on stage enter. */
+  narration: string;
 };
 
 export type SequenceDeal = {
   id: SequenceStoryId;
   steps: readonly SequenceStep[];
   tray: SequenceStep[];
-  narration?: string;
+  narration: string;
 };
 
 export type SequenceSlots = Array<SpriteName | null>;
@@ -57,22 +57,27 @@ function step(sprite: SpriteName, label: string): SequenceStep {
 export const EASY_STORIES: readonly SequenceStory[] = [
   {
     id: 'picnic-basic',
+    narration: '先離開屋企，去買漢堡，再去公園玩。',
     steps: [step('home', '家'), step('burger', '漢堡'), step('park', '公園')],
   },
   {
     id: 'drive-park',
+    narration: '先離開屋企，坐小車出門，再去到公園。',
     steps: [step('home', '家'), step('car', '小車'), step('park', '公園')],
   },
   {
     id: 'kid-brush',
+    narration: '小朋友先準備好，攞起牙刷，再刷牙齒。',
     steps: [step('kid', '小朋友'), step('toothbrush', '牙刷'), step('tooth', '牙齒')],
   },
   {
     id: 'farm-pets',
+    narration: '農場先見狗迎接，再摸貓，最後抱兔。',
     steps: [step('dog', '狗'), step('cat', '貓'), step('rabbit', '兔')],
   },
   {
     id: 'farm-pond',
+    narration: '水邊先見鴨游水，再見到青蛙，最後見到龜。',
     steps: [step('duck', '鴨'), step('frog', '青蛙'), step('tortoise', '龜')],
   },
 ];
@@ -80,14 +85,17 @@ export const EASY_STORIES: readonly SequenceStory[] = [
 export const BASIC_STORIES: readonly SequenceStory[] = [
   {
     id: 'picnic-shop',
+    narration: '先離開屋企，去商店買嘢，攞到漢堡，再去公園。',
     steps: [step('home', '家'), step('shop', '商店'), step('burger', '漢堡'), step('park', '公園')],
   },
   {
     id: 'picnic-spread',
+    narration: '先離開屋企，坐小車出門，去到公園，再鋪開野餐。',
     steps: [step('home', '家'), step('car', '小車'), step('park', '公園'), step('picnic', '野餐')],
   },
   {
     id: 'delivery-short',
+    narration: '貨車先出發，載住包裹，送到屋企，再去公園。',
     steps: [step('truck', '貨車'), step('parcel', '包裹'), step('home', '家'), step('park', '公園')],
   },
   {
@@ -98,6 +106,7 @@ export const BASIC_STORIES: readonly SequenceStory[] = [
   },
   {
     id: 'farm-barn',
+    narration: '農場門口先見狗，再見到羊，之後見豬，最後見牛。',
     steps: [step('dog', '狗'), step('sheep', '羊'), step('pig', '豬'), step('cow', '牛')],
   },
 ];
@@ -105,6 +114,7 @@ export const BASIC_STORIES: readonly SequenceStory[] = [
 export const PUZZLE_STORIES: readonly SequenceStory[] = [
   {
     id: 'picnic-full',
+    narration: '先離開屋企，坐小車，去商店，再到公園，最後野餐。',
     steps: [
       step('home', '家'),
       step('car', '小車'),
@@ -115,6 +125,7 @@ export const PUZZLE_STORIES: readonly SequenceStory[] = [
   },
   {
     id: 'picnic-burger',
+    narration: '先離開屋企，攞埋漢堡，坐小車出門，去到公園，再野餐。',
     steps: [
       step('home', '家'),
       step('burger', '漢堡'),
@@ -125,6 +136,7 @@ export const PUZZLE_STORIES: readonly SequenceStory[] = [
   },
   {
     id: 'delivery-day',
+    narration: '貨車先出發，載住包裹，經商店，送到屋企，再去公園。',
     steps: [
       step('truck', '貨車'),
       step('parcel', '包裹'),
@@ -135,6 +147,7 @@ export const PUZZLE_STORIES: readonly SequenceStory[] = [
   },
   {
     id: 'farm-day',
+    narration: '小朋友先到農場，狗狗迎接，再睇羊，之後見牛，最後見馬。',
     steps: [
       step('kid', '小朋友'),
       step('dog', '狗'),
@@ -145,6 +158,7 @@ export const PUZZLE_STORIES: readonly SequenceStory[] = [
   },
   {
     id: 'farm-yard',
+    narration: '院子先見貓，再見雞，去到水邊見鴨同青蛙，最後抬頭見鳥。',
     steps: [
       step('cat', '貓'),
       step('chicken', '雞'),
@@ -243,6 +257,6 @@ export function dealSequence(
     id: chosen.id,
     steps: chosen.steps,
     tray: shuffle(rand, chosen.steps),
-    ...(chosen.narration ? { narration: chosen.narration } : {}),
+    narration: chosen.narration,
   };
 }

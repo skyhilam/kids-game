@@ -3,7 +3,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createApp, nextTick, type App } from 'vue';
 import SequencePlay from '../src/components/SequencePlay.vue';
 import { SEQUENCE_COPY } from '../src/sequence/copy';
-import { dealSequence, type SequenceStoryId } from '../src/sequence/stories';
+import {
+  BASIC_STORIES,
+  dealSequence,
+  EASY_STORIES,
+  PUZZLE_STORIES,
+  SEQUENCE_STORIES,
+  type SequenceStoryId,
+} from '../src/sequence/stories';
 
 const NARRATION = '雞媽媽先帶路，小雞跟住媽媽，去到水邊先見鴨，再見到青蛙。';
 
@@ -128,11 +135,15 @@ describe('farm-visit 語意 v2 play', () => {
     expect(view.host.querySelector('#sequence-dialog-title')?.textContent).toBe('次序啱喇！');
   });
 
-  it('still clears farm-barn and farm-pond without the farm-visit narration', async () => {
+  it('still clears farm-barn and farm-pond with their own narration, not farm-visit', async () => {
     const barn = mountSequence(seedFor('farm-barn', 1), 1);
     await begin(barn.host);
     expect(barn.host.querySelector('[data-sequence-story]')?.getAttribute('data-sequence-story')).toBe('farm-barn');
-    expect(barn.host.querySelector('[data-sequence-narration]')).toBeNull();
+    expect(barn.host.querySelector('[data-sequence-narration]')?.textContent?.trim()).toBe(
+      '農場門口先見狗，再見到羊，之後見豬，最後見牛。',
+    );
+    expect(barn.host.querySelector('[data-sequence-narration]')?.textContent).not.toContain('雞媽媽');
+    expect(barn.host.querySelector('.sequence-tray')?.getAttribute('aria-describedby')).toBe('sequence-narration');
     expect(cards(barn.host).sort()).toEqual(['cow', 'dog', 'pig', 'sheep']);
     expect(cards(barn.host)).not.toContain('kid');
     expect(cards(barn.host)).not.toContain('toothbrush');
@@ -144,11 +155,30 @@ describe('farm-visit 語意 v2 play', () => {
     const pond = mountSequence(seedFor('farm-pond', 0), 0);
     await begin(pond.host);
     expect(pond.host.querySelector('[data-sequence-story]')?.getAttribute('data-sequence-story')).toBe('farm-pond');
-    expect(pond.host.querySelector('[data-sequence-narration]')).toBeNull();
+    expect(pond.host.querySelector('[data-sequence-narration]')?.textContent?.trim()).toBe(
+      '水邊先見鴨游水，再見到青蛙，最後見到龜。',
+    );
+    expect(pond.host.querySelector('[data-sequence-narration]')?.textContent).not.toBe(NARRATION);
     expect(cards(pond.host).sort()).toEqual(['duck', 'frog', 'tortoise']);
     for (const sprite of ['duck', 'frog', 'tortoise']) clickCard(pond.host, sprite);
     await flush();
     expect(placed(pond.host)).toEqual(['duck', 'frog', 'tortoise']);
     expect(dialogOpen(pond.host)).toBe(true);
+  });
+
+  it('shows each story narration on stage enter', async () => {
+    const levelOf = (id: SequenceStoryId): number => {
+      if (EASY_STORIES.some((story) => story.id === id)) return 0;
+      if (BASIC_STORIES.some((story) => story.id === id)) return 1;
+      return 8;
+    };
+    expect(PUZZLE_STORIES).toHaveLength(5);
+    for (const story of SEQUENCE_STORIES) {
+      const view = mountSequence(seedFor(story.id, levelOf(story.id)), levelOf(story.id));
+      await begin(view.host);
+      expect(view.host.querySelector('[data-sequence-story]')?.getAttribute('data-sequence-story')).toBe(story.id);
+      expect(view.host.querySelector('[data-sequence-narration]')?.textContent?.trim()).toBe(story.narration);
+      expect(view.host.querySelector('.sequence-tray')?.getAttribute('aria-describedby')).toBe('sequence-narration');
+    }
   });
 });
