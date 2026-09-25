@@ -132,7 +132,8 @@ describe('farm-visit 語意 v2', () => {
     expect(spritesInStory).not.toContain('kid');
     expect(spritesInStory).not.toContain('toothbrush');
     expect(spritesInStory.every((name) => sprites[name].atlas === 'farm')).toBe(true);
-    expect(SEQUENCE_STORIES.filter((story) => story.narration).map((story) => story.id)).toEqual(['farm-visit']);
+    expect(visit?.narration.length).toBeGreaterThan(0);
+    expect(SEQUENCE_STORIES.every((story) => story.narration.length > 0)).toBe(true);
   });
 
   it('deals a four-animal farm tray and still judges wrong order as a soft miss', () => {
@@ -174,9 +175,11 @@ describe('farm-visit 語意 v2', () => {
     const pond = EASY_STORIES.find((story) => story.id === 'farm-pond');
     const barn = BASIC_STORIES.find((story) => story.id === 'farm-barn');
     expect(pond?.steps.map((step) => `${step.sprite}${step.label}`)).toEqual(['duck鴨', 'frog青蛙', 'tortoise龜']);
-    expect(pond?.narration).toBeUndefined();
+    expect(pond?.narration).toBe('水邊先見鴨游水，再見到青蛙，最後見到龜。');
     expect(barn?.steps.map((step) => `${step.sprite}${step.label}`)).toEqual(['dog狗', 'sheep羊', 'pig豬', 'cow牛']);
-    expect(barn?.narration).toBeUndefined();
+    expect(barn?.narration).toBe('農場門口先見狗，再見到羊，之後見豬，最後見牛。');
+    expect(pond?.narration).not.toBe(FARM_VISIT_NARRATION);
+    expect(barn?.narration).not.toBe(FARM_VISIT_NARRATION);
     expect(judgeWhenFull(pond!.steps.map((step) => step.sprite), pond!.steps)).toBe('correct');
     expect(judgeWhenFull(barn!.steps.map((step) => step.sprite), barn!.steps)).toBe('correct');
     expect(judgeWhenFull(['frog', 'duck', 'tortoise'], pond!.steps)).toBe('wrong');
@@ -193,6 +196,60 @@ describe('farm-visit 語意 v2', () => {
     const mobile = play.slice(play.indexOf('@media(max-width:700px)'));
     expect(mobile).toContain('.sequence-narration{font-size:13px;padding:8px 10px}');
     expect(mobile).not.toContain('.sequence-narration{display:none');
+  });
+});
+
+const SEQUENCE_NARRATION: Record<SequenceStoryId, string> = {
+  'picnic-basic': '先離開屋企，去買漢堡，再去公園玩。',
+  'drive-park': '先離開屋企，坐小車出門，再去到公園。',
+  'kid-brush': '小朋友先準備好，攞起牙刷，再刷牙齒。',
+  'farm-pets': '農場先見狗迎接，再摸貓，最後抱兔。',
+  'farm-pond': '水邊先見鴨游水，再見到青蛙，最後見到龜。',
+  'picnic-shop': '先離開屋企，去商店買嘢，攞到漢堡，再去公園。',
+  'picnic-spread': '先離開屋企，坐小車出門，去到公園，再鋪開野餐。',
+  'delivery-short': '貨車先出發，載住包裹，送到屋企，再去公園。',
+  'farm-barn': '農場門口先見狗，再見到羊，之後見豬，最後見牛。',
+  'farm-visit': '雞媽媽先帶路，小雞跟住媽媽，去到水邊先見鴨，再見到青蛙。',
+  'picnic-full': '先離開屋企，坐小車，去商店，再到公園，最後野餐。',
+  'picnic-burger': '先離開屋企，攞埋漢堡，坐小車出門，去到公園，再野餐。',
+  'delivery-day': '貨車先出發，載住包裹，經商店，送到屋企，再去公園。',
+  'farm-day': '小朋友先到農場，狗狗迎接，再睇羊，之後見牛，最後見馬。',
+  'farm-yard': '院子先見貓，再見雞，去到水邊見鴨同青蛙，最後抬頭見鳥。',
+};
+
+describe('sequence narration', () => {
+  it('gives every story a non-empty Cantonese narration, byte for byte', () => {
+    expect(Object.keys(SEQUENCE_NARRATION)).toHaveLength(15);
+    expect(SEQUENCE_STORIES.map((story) => story.id).sort()).toEqual(Object.keys(SEQUENCE_NARRATION).sort());
+    for (const story of SEQUENCE_STORIES) {
+      expect(story.narration).toBe(SEQUENCE_NARRATION[story.id]);
+      expect(story.narration.length).toBeGreaterThan(0);
+    }
+    expect(SEQUENCE_NARRATION['farm-visit']).toBe(FARM_VISIT_NARRATION);
+  });
+
+  it('copies that narration onto the deal without changing the step order', () => {
+    const bands: Array<{ level: number; stories: readonly { id: SequenceStoryId; steps: readonly { sprite: string }[]; narration: string }[] }> = [
+      { level: 0, stories: EASY_STORIES },
+      { level: 1, stories: BASIC_STORIES },
+      { level: 8, stories: PUZZLE_STORIES },
+    ];
+    for (const { level, stories } of bands) {
+      for (const story of stories) {
+        let seed = -1;
+        for (let candidate = 0; candidate < 2000; candidate += 1) {
+          if (dealSequence(candidate, level).id === story.id) {
+            seed = candidate;
+            break;
+          }
+        }
+        expect(seed).toBeGreaterThanOrEqual(0);
+        const deal = dealSequence(seed, level);
+        expect(deal.narration).toBe(SEQUENCE_NARRATION[story.id]);
+        expect(deal.steps.map((step) => step.sprite)).toEqual(story.steps.map((step) => step.sprite));
+        expect(judgeWhenFull(deal.steps.map((step) => step.sprite), deal.steps)).toBe('correct');
+      }
+    }
   });
 });
 
