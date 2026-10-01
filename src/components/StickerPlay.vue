@@ -12,6 +12,8 @@ import {
   placedCount,
   rollRecent,
   slotOf,
+  stickerDragLabel,
+  stickerZhCaption,
   tryPlace,
   WORD_EN,
   WORD_IDS,
@@ -294,7 +296,9 @@ onUnmounted(() => {
             }"
             :data-word-slot="word"
             role="listitem"
-            :aria-label="`英文詞 ${WORD_EN[word]}`"
+            :aria-label="`英文詞 ${stickerDragLabel(word)}`"
+            :data-word-zh="WORD_ZH[word]"
+            :data-word-en="WORD_EN[word]"
           >
             <button
               v-if="placed[word] && drag?.id !== placed[word]"
@@ -302,13 +306,19 @@ onUnmounted(() => {
               class="slot-sticker"
               :data-sticker="placed[word]"
               :data-placed="word"
+              :data-word-zh="WORD_ZH[placed[word]!]"
+              :aria-label="stickerDragLabel(placed[word]!)"
               @pointerdown="onDown($event, placed[word]!)"
             >
               <GameSprite :name="placed[word]!" :label="WORD_ZH[placed[word]!]" />
+              <span class="sticker-zh">{{ stickerZhCaption(placed[word]!) }}</span>
             </button>
             <span class="word-label">
-              {{ WORD_EN[word] }}
-              <small v-if="placed[word] && drag?.id !== placed[word]" aria-hidden="true">✓</small>
+              <span class="word-en">
+                {{ WORD_EN[word] }}
+                <small v-if="placed[word] && drag?.id !== placed[word]" aria-hidden="true">✓</small>
+              </span>
+              <span class="word-zh">{{ stickerZhCaption(word) }}</span>
             </span>
           </div>
         </div>
@@ -328,9 +338,13 @@ onUnmounted(() => {
               type="button"
               class="sticker-chip"
               :data-sticker="word"
+              :data-word-zh="WORD_ZH[word]"
+              :data-word-en="WORD_EN[word]"
+              :aria-label="stickerDragLabel(word)"
               @pointerdown="onDown($event, word)"
             >
               <GameSprite :name="word" :label="WORD_ZH[word]" />
+              <span class="sticker-zh">{{ stickerZhCaption(word) }}</span>
             </button>
           </div>
         </div>
@@ -358,6 +372,7 @@ onUnmounted(() => {
     aria-hidden="true"
   >
     <GameSprite :name="drag.id" />
+    <span class="sticker-zh">{{ stickerZhCaption(drag.id) }}</span>
   </div>
 
   <MazeDialog
@@ -453,7 +468,9 @@ onUnmounted(() => {
 .word-slot.filled{border-style:solid;border-color:#b7d0a4;background:#fffdf8;justify-content:flex-end}
 .word-slot.over{border-color:#e6a557;background:#fff6df}
 .word-slot.shake{animation:words-shake .4s ease}
-.word-label{font-size:22px;letter-spacing:.6px;color:#4f6b4c;font-weight:850;display:flex;align-items:center;gap:6px}
+.word-label{font-size:22px;letter-spacing:.6px;color:#4f6b4c;font-weight:850;display:flex;flex-direction:column;align-items:center;gap:2px}
+.word-en{display:flex;align-items:center;gap:6px}
+.word-zh,.sticker-zh{font-size:13px;font-weight:750;letter-spacing:0;color:#6d8664;line-height:1.15}
 .word-label small{width:18px;height:18px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;display:grid;place-items:center}
 .slot-sticker,.sticker-chip{width:100%;height:auto;background:transparent;padding:0;display:grid;place-items:center;touch-action:none}
 .slot-sticker{flex:1;min-height:64px}
@@ -471,6 +488,7 @@ onUnmounted(() => {
   .word-slots{flex:none;gap:8px}
   .word-slot{min-height:112px}
   .word-label{font-size:16px}
+  .word-zh,.sticker-zh{font-size:12px}
   .slot-sticker{min-height:56px}
   .slot-sticker svg,.sticker-chip svg{width:56px;height:50px}
   .sticker-tray{grid-template-columns:repeat(3,minmax(0,1fr))}

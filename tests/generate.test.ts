@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { createGame, findSolution } from '../src/game/rules';
+import { applyMove, createGame, findSolution, tryMove } from '../src/game/rules';
+import type { LevelDef } from '../src/game/types';
 import { picnicLevel, LEVELS } from '../src/picnic/levels';
 import { toothLevel, TOOTH_LEVELS } from '../src/tooth/levels';
 
@@ -193,19 +194,19 @@ describe('endless maze maps', () => {
     expect(picnicLevel(9, 7)).toEqual({
       name: '繞去公園',
       short: '繞園',
-      start: 'r0c0',
-      collect: 'r1c1',
-      goal: 'r2c3',
+      start: 'r0c3',
+      collect: 'r2c2',
+      goal: 'r2c0',
       nodes: {
         r0c0: [120, 155], r0c1: [320, 155], r0c2: [520, 155], r0c3: [720, 155],
         r1c0: [120, 345], r1c1: [320, 345], r1c2: [520, 345], r1c3: [720, 345],
         r2c0: [120, 545], r2c1: [320, 545], r2c2: [520, 545], r2c3: [720, 545],
       },
       edges: [
-        ['r0c3', 'r1c3'], ['r0c2', 'r1c2'], ['r2c1', 'r2c2'], ['r0c1', 'r1c1'],
-        ['r1c2', 'r2c2'], ['r2c0', 'r2c1'], ['r0c2', 'r0c3'], ['r1c0', 'r2c0'],
-        ['r0c0', 'r1c0'], ['r0c0', 'r0c1'], ['r1c3', 'r2c3'], ['r2c2', 'r2c3'],
-        ['r1c1', 'r1c2'], ['r1c1', 'r2c1'], ['r1c2', 'r1c3'],
+        ['r0c1', 'r1c1'], ['r1c3', 'r2c3'], ['r0c2', 'r1c2'], ['r1c2', 'r1c3'],
+        ['r2c2', 'r2c3'], ['r0c3', 'r1c3'], ['r1c1', 'r1c2'], ['r2c0', 'r2c1'],
+        ['r0c0', 'r0c1'], ['r1c0', 'r1c1'], ['r2c1', 'r2c2'], ['r0c2', 'r0c3'],
+        ['r0c1', 'r0c2'], ['r1c2', 'r2c2'],
       ],
     });
     expect(toothLevel(15, 0)).toEqual({
@@ -226,6 +227,62 @@ describe('endless maze maps', () => {
         ['r0c0', 'r0c1'], ['r1c1', 'r1c2'], ['r1c1', 'r2c1'],
       ],
     });
+  });
+
+  it('gates the picnic park behind the shop from displayed L8 onward', () => {
+    const reachesParkBeforeShop = (level: LevelDef) => {
+      const collect = level.collect;
+      if (!collect) return true;
+      const adj = new Map<string, string[]>();
+      for (const [a, b] of level.edges) {
+        adj.set(a, [...(adj.get(a) ?? []), b]);
+        adj.set(b, [...(adj.get(b) ?? []), a]);
+      }
+      const seen = new Set<string>();
+      const stack = [level.start];
+      while (stack.length) {
+        const node = stack.pop();
+        if (!node || node === collect || seen.has(node)) continue;
+        if (node === level.goal) return true;
+        seen.add(node);
+        for (const next of adj.get(node) ?? []) stack.push(next);
+      }
+      return false;
+    };
+
+    for (const seed of [0, 1, 7, 11, 42, 99, 4242]) {
+      for (let index = 0; index < 7; index += 1) {
+        const early = picnicLevel(index, seed);
+        expect(findSolution(
+          createGame((i) => picnicLevel(i, seed), index).graph,
+          early.start,
+          false,
+          new Set(),
+        ), `picnic L${index + 1} seed ${seed}`).not.toBeNull();
+      }
+      for (let index = 7; index < 12; index += 1) {
+        const level = picnicLevel(index, seed);
+        expect(reachesParkBeforeShop(level), `L${index + 1} seed ${seed} bypass`).toBe(false);
+        const { graph, state } = createGame((i) => picnicLevel(i, seed), index);
+        const path = findSolution(graph, state.node, state.collected, state.used);
+        expect(path, `L${index + 1} seed ${seed}`).not.toBeNull();
+        expect(path).toContain(graph.collect);
+        let sawParkChoice = false;
+        for (const to of path ?? []) {
+          const choices = graph.adj[state.node]?.filter((link) => !state.used.has(link.edge.id)) ?? [];
+          if (!state.collected && choices.some((link) => link.to === graph.goal)) sawParkChoice = true;
+          const move = tryMove(graph, state, to);
+          expect(move.ok, `L${index + 1} seed ${seed} -> ${to}`).toBe(true);
+          if (!move.ok) return;
+          applyMove(state, move);
+          expect(move.stalled, `L${index + 1} seed ${seed}`).toBe(false);
+        }
+        expect(sawParkChoice, `L${index + 1} seed ${seed} park before burger`).toBe(false);
+        expect(state.won).toBe(true);
+        expect(state.collected).toBe(true);
+        expect(state.node).toBe(graph.goal);
+      }
+    }
   });
 
   it('does not export maze internals as a delivery toolkit', () => {

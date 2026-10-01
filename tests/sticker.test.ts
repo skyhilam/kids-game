@@ -17,6 +17,9 @@ import {
   slotOf,
   STICKER_POOL,
   stickerWordCount,
+  DUCK_ZH_FORMS,
+  stickerDragLabel,
+  stickerZhCaption,
   tryPlace,
   WORD_EN,
   WORD_IDS,
@@ -54,6 +57,12 @@ describe('sticker word list and deal', () => {
     expect(WORD_EN.chicken).toBe('chicken');
     expect(WORD_ZH.duck).toBe('鴨');
     expect(WORD_EN.duck).toBe('duck');
+    expect(stickerZhCaption('duck')).toBe('鴨 鴨子');
+    expect(stickerDragLabel('duck')).toBe('鴨 鴨子 鸭 鸭子 duck');
+    expect([...DUCK_ZH_FORMS]).toEqual(['鴨', '鴨子', '鸭', '鸭子']);
+    for (const form of DUCK_ZH_FORMS) expect(stickerDragLabel('duck')).toContain(form);
+    expect(stickerZhCaption('chicken')).toBe('雞');
+    expect(stickerDragLabel('chicken')).toBe('雞 chicken');
     expect(WORD_ZH.cow).toBe('牛');
     expect(WORD_EN.cow).toBe('cow');
     expect(WORD_ZH.pig).toBe('豬');
@@ -309,6 +318,9 @@ describe('sticker stages, copy, and hub wiring', () => {
     expect(play).toContain('rollRecent');
     expect(play).toContain('usePlayAudio');
     expect(play).toContain('speakEnglish(soundOn.value, WORD_EN[id])');
+    expect(play).toContain('stickerDragLabel');
+    expect(play).toContain('stickerZhCaption');
+    expect(play).toContain('data-word-zh');
     expect(play).not.toMatch(/speak\(soundOn\.value,\s*id\)/);
     expect(play).not.toMatch(/speakEnglish\(soundOn\.value,\s*id\)/);
     expect(play).not.toMatch(/貼紙冊|100 枚/);

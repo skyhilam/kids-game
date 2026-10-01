@@ -103,6 +103,37 @@ function placeSpur(
   return null;
 }
 
+/**
+ * Displayed L8 (index 7) and above: the park is not reachable until the shop
+ * is visited. Otherwise a used-road trail can leave 「向上往公園」 as the only
+ * click while the hamburger is still unbought.
+ */
+const PICNIC_SHOP_GATE_FROM = 7;
+
+function shopGatesPark(level: Pick<LevelDef, 'start' | 'goal' | 'collect' | 'edges'>): boolean {
+  const collect = level.collect;
+  if (!collect || collect === level.start || collect === level.goal) return false;
+  const adj = new Map<string, string[]>();
+  for (const [a, b] of level.edges) {
+    const left = adj.get(a) ?? [];
+    left.push(b);
+    adj.set(a, left);
+    const right = adj.get(b) ?? [];
+    right.push(a);
+    adj.set(b, right);
+  }
+  const seen = new Set<string>();
+  const stack = [level.start];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || node === collect || seen.has(node)) continue;
+    if (node === level.goal) return false;
+    seen.add(node);
+    for (const next of adj.get(node) ?? []) stack.push(next);
+  }
+  return true;
+}
+
 function valid(level: LevelDef, kind: MazeKind): boolean {
   if (level.edges.length > 24) return false;
   const graph = makeGraph([level], 0);
@@ -124,6 +155,22 @@ function fallback(kind: MazeKind, index: number): LevelDef {
     r2c0: [135, 545], r2c1: [435, 545], r2c2: [685, 545],
   };
   if (kind === 'picnic') {
+    if (index >= PICNIC_SHOP_GATE_FROM) {
+      return {
+        ...title,
+        start: 'r1c0',
+        collect: 'r1c1',
+        goal: 'r1c2',
+        nodes,
+        edges: [
+          ['r1c0', 'r0c0'], ['r0c0', 'r0c1'], ['r0c1', 'r1c1'],
+          ['r1c0', 'r1c1'],
+          ['r1c0', 'r2c0'], ['r2c0', 'r2c1'], ['r2c1', 'r1c1'],
+          ['r1c1', 'r1c2'],
+          ['r1c2', 'r0c2'], ['r1c2', 'r2c2'],
+        ],
+      };
+    }
     return {
       ...title,
       start: 'r1c0',
@@ -171,10 +218,14 @@ function attempt(kind: MazeKind, index: number, attemptNo: number, seed: number)
 
   if (kind === 'picnic') {
     const mids = shuffle(rand, ids.filter((id) => id !== start && id !== goal));
-    const collect = mids.find((id) => {
+    const far = (id: string) => {
       const point = nodes[id]!;
       return hypot(point, nodes[start]!) >= 240 && hypot(point, nodes[goal]!) >= 240;
-    }) ?? mids[0];
+    };
+    const gated = mids.filter((id) => shopGatesPark({ start, goal, collect: id, edges }));
+    const collect = index >= PICNIC_SHOP_GATE_FROM
+      ? (gated.find(far) ?? gated[0])
+      : (mids.find(far) ?? mids[0]);
     if (!collect) return null;
     const level: LevelDef = {
       ...title,
@@ -184,6 +235,7 @@ function attempt(kind: MazeKind, index: number, attemptNo: number, seed: number)
       nodes,
       edges,
     };
+    if (index >= PICNIC_SHOP_GATE_FROM && !shopGatesPark(level)) return null;
     return valid(level, 'picnic') ? level : null;
   }
 

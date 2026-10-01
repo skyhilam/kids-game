@@ -155,6 +155,26 @@ export const WORD_EN: Record<WordId, string> = {
   horse: 'horse',
 };
 
+/**
+ * Duck picture is a yellow duckling. OS-drag matchers miss when they look up
+ * 鴨子 / 鸭 / 鸭子 and the board only exposes 鴨 or the English slot.
+ * Canonical WORD_ZH stays 鴨.
+ */
+export const DUCK_ZH_FORMS = ['鴨', '鴨子', '鸭', '鸭子'] as const;
+
+/** Chinese caption shown with the picture and under the English slot. */
+export function stickerZhCaption(id: WordId): string {
+  return id === 'duck' ? '鴨 鴨子' : WORD_ZH[id];
+}
+
+/** Accessible drag name: Chinese form(s) plus the English slot word. */
+export function stickerDragLabel(id: WordId): string {
+  const names = id === 'duck'
+    ? [...DUCK_ZH_FORMS, WORD_EN[id]]
+    : [WORD_ZH[id], WORD_EN[id]];
+  return [...new Set(names)].join(' ');
+}
+
 export function isWordId(id: string): id is WordId {
   return (WORD_IDS as readonly string[]).includes(id);
 }
