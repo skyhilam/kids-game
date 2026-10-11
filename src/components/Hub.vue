@@ -2,7 +2,7 @@
 import { STAGE_OVERVIEW } from '../game/stages';
 import GameSprite from './GameSprite.vue';
 const emit = defineEmits<{
-  pick: [activity: 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen' | 'sequence'];
+  pick: [activity: 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen' | 'sequence' | 'formula'];
 }>();
 </script>
 
@@ -90,6 +90,23 @@ const emit = defineEmits<{
         <strong>出遊順序卡</strong>
         <span>依序點選步驟，排出正確出遊次序。</span>
         <small class="hub-modes">{{ STAGE_OVERVIEW }} · 點選排序</small>
+      </button>
+      <button class="hub-card" type="button" @click="emit('pick', 'formula')">
+        <svg class="hub-art" viewBox="0 0 220 120" aria-hidden="true">
+          <rect width="220" height="120" rx="22" fill="#e7f3ee"/>
+          <ellipse cx="118" cy="86" rx="72" ry="18" fill="#cfe3d4"/>
+          <circle cx="74" cy="64" r="30" fill="#fffdf7" stroke="#9fc3bf" stroke-width="3"/>
+          <polygon points="74,38 81,58 74,64 67,58" fill="#e89d7d"/>
+          <polygon points="74,90 81,70 74,64 67,70" fill="#9fb983"/>
+          <polygon points="48,64 68,57 74,64 68,71" fill="#9fb983"/>
+          <polygon points="100,64 80,57 74,64 80,71" fill="#e9c465"/>
+          <circle cx="74" cy="64" r="4" fill="#4c6d5d"/>
+          <GameSprite name="tree" x="112" y="22" width="48" height="54"/>
+          <GameSprite name="sun" x="158" y="12" width="44" height="42"/>
+        </svg>
+        <strong>公式島</strong>
+        <span>休息站：八個島區，由易到難。</span>
+        <small class="hub-modes">8–14 歲 · 休息站小遊戲</small>
       </button>
     </div>
     <p class="hub-studio-link"><a href="#sprite-studio">素材工房 <span>用 Canvas 製作自己的遊戲素材 →</span></a></p>

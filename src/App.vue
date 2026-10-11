@@ -10,8 +10,9 @@ import StickerPlay from './components/StickerPlay.vue';
 import ToothPlay from './components/ToothPlay.vue';
 import { initializeLibrary } from './studio/store';
 
-const activity = ref<'hub' | 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen' | 'sequence'>('hub');
+const activity = ref<'hub' | 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen' | 'sequence' | 'formula'>('hub');
 const SpriteStudio = defineAsyncComponent(() => import('./studio/SpriteStudio.vue'));
+const FormulaPlay = defineAsyncComponent(() => import('./components/FormulaPlay.vue'));
 const studioOpen = ref(window.location.hash === '#sprite-studio');
 function syncRoute() { studioOpen.value = window.location.hash === '#sprite-studio'; }
 function closeStudio() { window.location.hash = ''; }
@@ -29,4 +30,5 @@ onUnmounted(() => window.removeEventListener('hashchange', syncRoute));
   <StickerPlay v-else-if="activity === 'sticker'" @home="activity = 'hub'"/>
   <ListenPlay v-else-if="activity === 'listen'" @home="activity = 'hub'"/>
   <SequencePlay v-else-if="activity === 'sequence'" @home="activity = 'hub'"/>
+  <FormulaPlay v-else-if="activity === 'formula'" @home="activity = 'hub'"/>
 </template>
