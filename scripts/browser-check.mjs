@@ -187,6 +187,58 @@ async function runPicnicPass(page, pass) {
   log(`pass ${pass}: title=${title} board=${Math.round(boardBox.width)}x${Math.round(boardBox.height)} targets=${targets} errors=0`);
 }
 
+async function runFormulaRestStop(page) {
+  const errors = [];
+  const onError = (err) => errors.push(String(err));
+  page.on('pageerror', onError);
+  try {
+    await openHub(page);
+    await page.evaluate(() => localStorage.removeItem('kids-formula-island-v1'));
+    await page.getByRole('button', { name: '公式島' }).click();
+    await page.locator('[data-formula-overlay="welcome"]').waitFor();
+    await page.getByRole('button', { name: '開始遊戲' }).click();
+    await page.waitForFunction(() => !document.querySelector('dialog')?.open);
+    await page.locator('[data-formula-screen="map"]').waitFor();
+    const zones = await page.locator('[data-formula-zone]').evaluateAll((nodes) => nodes.map((node) => ({
+      id: node.getAttribute('data-formula-zone'),
+      unlocked: node.getAttribute('data-formula-unlocked'),
+      disabled: node.disabled,
+    })));
+    const ids = zones.map((zone) => zone.id).join(',');
+    if (zones.length !== 8 || ids !== '1,2,3,4,5,6,7,8') {
+      throw new Error(`expected 8 formula zones, got ${ids || zones.length}`);
+    }
+    const zone1 = zones[0];
+    const zone2 = zones[1];
+    if (zone1.unlocked !== 'true' || zone1.disabled) {
+      throw new Error(`zone 1 should be unlocked on a fresh profile: ${JSON.stringify(zone1)}`);
+    }
+    if (zone2.unlocked !== 'false' || !zone2.disabled) {
+      throw new Error(`zone 2 should be locked on a fresh profile: ${JSON.stringify(zone2)}`);
+    }
+    for (const zone of zones.slice(2)) {
+      if (zone.unlocked !== 'false' || !zone.disabled) {
+        throw new Error(`zone ${zone.id} should be locked on a fresh profile: ${JSON.stringify(zone)}`);
+      }
+    }
+    await goHome(page);
+    await page.getByRole('button', { name: '貼紙學單字' }).click();
+    await page.locator('#sticker-dialog-title', { hasText: '貼紙學單字' }).waitFor();
+    await page.getByRole('button', { name: '開始遊戲' }).waitFor();
+    await page.locator('.top-actions').getByRole('button', { name: '選擇遊戲' }).click();
+    await page.getByRole('heading', { name: '選擇遊戲' }).waitFor();
+    await page.getByRole('button', { name: '聽一聽揀圖' }).click();
+    await page.locator('#listen-dialog-title', { hasText: '聽一聽揀圖' }).waitFor();
+    await page.getByRole('button', { name: '開始遊戲' }).waitFor();
+    await page.locator('.top-actions').getByRole('button', { name: '選擇遊戲' }).click();
+    await page.getByRole('heading', { name: '選擇遊戲' }).waitFor();
+    if (errors.length) throw new Error(`formula page errors: ${errors.join(' | ')}`);
+    log('formula island: 8 zones, zone 1 open, zone 2 locked; sticker and listen still open; errors=0');
+  } finally {
+    page.off('pageerror', onError);
+  }
+}
+
 async function runActivities(page) {
   const errors = [];
   page.on('pageerror', (err) => errors.push(String(err)));
@@ -272,6 +324,7 @@ try {
   await page.screenshot({ path: join(outDir, 'tooth-generated.png'), fullPage: true });
   log('desktop tooth: first map then 第 2 關 playable');
   await goHome(page);
+  await runFormulaRestStop(page);
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await openHub(mobile);
