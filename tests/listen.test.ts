@@ -226,7 +226,7 @@ describe('listen copy, parent guide, and hub card', () => {
     expect(hub).toContain('聽詞揀圖');
     expect(hub).toMatch(/emit\('pick', 'listen'\)/);
     expect(hub).toContain('name="kid"');
-    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(6);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(7);
     expect([...hub.matchAll(/class="hub-stages"/g)]).toHaveLength(3);
     expect(hub).toContain('貼紙學單字');
     expect(hub).toContain('一起去野餐');
