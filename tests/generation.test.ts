@@ -14,12 +14,30 @@ function png(index = 0, width = 256, height = 256) { const bytes = Buffer.alloc(
 const input: GenerationInput = { sprite: 'bear', source: png(), referenceCanvas: png(0, 1536, 768), motion: 'wave', action: 'Wave with articulated arm poses', frames: 8, seed: 42 };
 const directories: string[] = [];
 async function directory() { const dir = await mkdtemp(join(tmpdir(), 'sprite-generation-test-')); directories.push(dir); return dir; }
-afterEach(async () => { vi.unstubAllGlobals(); await Promise.all(directories.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
+// A completed job renames its JSON into this directory after the test sees the new status.
+// On Linux that races Node's recursive rm and rmdir throws ENOTEMPTY.
+async function removeDirectory(dir: string) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      await rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 20 });
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') return;
+      if (attempt === 5 || (code !== 'ENOTEMPTY' && code !== 'EBUSY' && code !== 'EPERM')) throw error;
+      await new Promise(resolve => setTimeout(resolve, 30 * (attempt + 1)));
+    }
+  }
+}
+afterEach(async () => { vi.unstubAllGlobals(); await Promise.all(directories.splice(0).map(removeDirectory)); });
 const response = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } });
 const atlasResult = { data: [{ b64_json: png(1, 1536, 768).split(',')[1] }] };
 const finish = async (service: ReturnType<typeof createGenerationService>, id: string) => {
   await vi.waitFor(async () => expect((await service.poll(id)).status).not.toBe('processing'));
-  return service.poll(id);
+  const job = await service.poll(id);
+  // Failed and completed jobs clear the active lock only after the status file is saved.
+  if (job.status !== 'uncertain') await vi.waitFor(async () => expect((await service.status()).activeId).toBeNull());
+  return job;
 };
 async function submitThroughMiddleware(service: ReturnType<typeof createGenerationService>, authorization?: string) {
   const req = Object.assign(Readable.from([JSON.stringify(input)]), {
