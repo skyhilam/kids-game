@@ -1,8 +1,9 @@
 import { mulberry32, shuffle } from '../game/rng';
 import { listenLoadBand, type LoadBand } from '../game/stages';
 import { STICKER_POOL, type WordId } from '../sticker/words';
+import { SIMILARITY_GROUPS } from './similar';
 
-export { listenLoadBand };
+export { listenLoadBand, SIMILARITY_GROUPS };
 
 export const LISTEN_RECENT = 2;
 
@@ -12,24 +13,6 @@ export const LISTEN_LOAD: Record<LoadBand, { n: number; k: number }> = {
   basic: { n: 4, k: 4 },
   puzzle: { n: 6, k: 5 },
 };
-
-/**
- * Visual/word neighbours used as forced distractors on basic/puzzle.
- * `burger`/`picnic` is the optional extra pair on top of park/picnic.
- */
-export const SIMILARITY_GROUPS: readonly (readonly WordId[])[] = [
-  ['car', 'truck'],
-  ['home', 'shop'],
-  ['tree', 'flower'],
-  ['park', 'picnic'],
-  ['tooth', 'toothbrush'],
-  ['bear', 'kid'],
-  ['burger', 'picnic'],
-  ['dog', 'cat'],
-  ['chicken', 'duck'],
-  ['cow', 'horse'],
-  ['pig', 'sheep'],
-];
 
 export type ListenDeal = {
   target: WordId;

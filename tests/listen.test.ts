@@ -8,6 +8,7 @@ import {
   dealListen,
   LISTEN_LOAD,
   LISTEN_RECENT,
+  SIMILARITY_GROUPS,
   listenLoadBand,
   listenOptionCount,
   listenStreakNeed,
@@ -23,7 +24,7 @@ import {
   speakListenWord,
   writeListenLang,
 } from '../src/listen/speech';
-import { BASIC_POOL, EASY_POOL, PUZZLE_POOL, STICKER_POOL } from '../src/sticker/words';
+import { BASIC_POOL, EASY_POOL, PUZZLE_POOL, STICKER_POOL, isWordId } from '../src/sticker/words';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const claims = /貼紙冊|100 枚|智商|智力|大腦|腦部|年齡標準/;
@@ -75,7 +76,7 @@ describe('listen bands, N/K, and deals', () => {
 
     const laterTheme = [
       'burger', 'shop', 'truck', 'picnic', 'parcel', 'tooth', 'toothbrush', 'bug-coral',
-      'dog', 'cat', 'chicken', 'duck', 'cow', 'pig', 'sheep', 'horse',
+      'chicken', 'cow', 'pig', 'sheep', 'horse',
     ] as const;
     const easySeen = new Set(Array.from({ length: 48 }, (_, seed) => dealListen(seed, 0).options).flat());
     expect(laterTheme.every((id) => !easySeen.has(id))).toBe(true);
@@ -83,16 +84,29 @@ describe('listen bands, N/K, and deals', () => {
     const basicSeen = new Set(Array.from({ length: 80 }, (_, seed) => dealListen(seed, 1).options).flat());
     expect(basicSeen.has('burger') || basicSeen.has('shop') || basicSeen.has('truck')).toBe(true);
     expect(['dog', 'cat', 'chicken', 'duck'].some((id) => basicSeen.has(id))).toBe(true);
-    expect((['parcel', 'tooth', 'toothbrush', 'bug-coral', 'cow', 'pig', 'sheep', 'horse'] as const).every((id) => !basicSeen.has(id))).toBe(true);
+    expect((['parcel', 'tooth', 'toothbrush', 'bug-coral'] as const).every((id) => !basicSeen.has(id))).toBe(true);
 
     const puzzleSeen = new Set(Array.from({ length: 80 }, (_, seed) => dealListen(seed, 8).options).flat());
     expect(puzzleSeen.has('toothbrush')).toBe(true);
     expect(['cow', 'pig', 'sheep', 'horse'].some((id) => puzzleSeen.has(id))).toBe(true);
   });
 
+  it('keeps at least 15 valid similarity groups and six supported targets per harder band', () => {
+    expect(SIMILARITY_GROUPS.length).toBeGreaterThanOrEqual(15);
+    for (const group of SIMILARITY_GROUPS) {
+      expect(group.length).toBeGreaterThanOrEqual(2);
+      expect(new Set(group).size).toBe(group.length);
+      expect(group.every(isWordId)).toBe(true);
+    }
+    for (const pool of [BASIC_POOL, PUZZLE_POOL]) {
+      expect(pool.filter((id) => similarityPeers(id, pool).length > 0).length)
+        .toBeGreaterThanOrEqual(6);
+    }
+  });
+
   it('forces a similarity distractor on basic/puzzle when a peer is in the band pool', () => {
     expect(similarityPeers('car', BASIC_POOL)).toEqual(['truck']);
-    expect(similarityPeers('truck', BASIC_POOL)).toEqual(['car']);
+    expect(similarityPeers('truck', BASIC_POOL)).toEqual(['car', 'train']);
     expect(similarityPeers('picnic', BASIC_POOL).sort()).toEqual(['burger', 'park']);
     expect(similarityPeers('burger', BASIC_POOL)).toEqual(['picnic']);
     expect(similarityPeers('sun', BASIC_POOL)).toEqual([]);
@@ -103,12 +117,12 @@ describe('listen bands, N/K, and deals', () => {
     expect(similarityPeers('cat', BASIC_POOL)).toEqual(['dog']);
     expect(similarityPeers('chicken', BASIC_POOL)).toEqual(['duck']);
     expect(similarityPeers('duck', BASIC_POOL)).toEqual(['chicken']);
-    expect(similarityPeers('cow', PUZZLE_POOL)).toEqual(['horse']);
+    expect(similarityPeers('cow', PUZZLE_POOL)).toEqual(['horse', 'sheep']);
     expect(similarityPeers('horse', PUZZLE_POOL)).toEqual(['cow']);
     expect(similarityPeers('pig', PUZZLE_POOL)).toEqual(['sheep']);
-    expect(similarityPeers('sheep', PUZZLE_POOL)).toEqual(['pig']);
-    expect(similarityPeers('dog', EASY_POOL)).toEqual([]);
-    expect(similarityPeers('cow', BASIC_POOL)).toEqual([]);
+    expect(similarityPeers('sheep', PUZZLE_POOL)).toEqual(['pig', 'cow']);
+    expect(similarityPeers('dog', EASY_POOL)).toEqual(['cat']);
+    expect(similarityPeers('cow', BASIC_POOL)).toEqual(['horse', 'sheep']);
 
     for (const seed of Array.from({ length: 80 }, (_, i) => i)) {
       const deal = dealListen(seed, 1);
