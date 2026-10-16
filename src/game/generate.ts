@@ -1,3 +1,4 @@
+import { distToSegment } from './geometry';
 import { firstValid, generateGridMaze, type Grid } from './gridMaze';
 import { makeGraph } from './graph';
 import { mixSeed, mulberry32, shuffle } from './rng';
@@ -33,15 +34,6 @@ const GRID_4x3: Grid = { xs: [120, 320, 520, 720], ys: [155, 345, 545] };
 
 function hypot(a: Point, b: Point): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1]);
-}
-
-function distToSegment(px: number, py: number, a: Point, b: Point): number {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  const len2 = dx * dx + dy * dy;
-  if (len2 < 1) return hypot([px, py], a);
-  const t = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / len2));
-  return Math.hypot(px - (a[0] + dx * t), py - (a[1] + dy * t));
 }
 
 function onExistingRoad(

@@ -1,3 +1,6 @@
+import { distToSegment, mapKey } from '../game/geometry';
+import { planDecor, type Box } from '../game/decor';
+export { distToSegment } from '../game/geometry';
 import type { Point } from '../game/types';
 import type { RouteMission } from '../game/routeMission';
 
@@ -9,15 +12,6 @@ const TREE_CANDIDATES = [
 const FLOWER_CANDIDATES = [
   [0.3, 0.59], [0.56, 0.91], [0.42, 0.78], [0.7, 0.5], [0.2, 0.88],
 ] as const;
-
-export function distToSegment(px: number, py: number, a: Point, b: Point): number {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  const len2 = dx * dx + dy * dy;
-  if (len2 < 1) return Math.hypot(px - a[0], py - a[1]);
-  const t = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / len2));
-  return Math.hypot(px - (a[0] + dx * t), py - (a[1] + dy * t));
-}
 
 export function clearOfRoads(mission: RouteMission, x: number, y: number, minDist = 58): boolean {
   for (const point of Object.values(mission.nodes)) {
@@ -53,4 +47,12 @@ export function deliveryTrees(mission: RouteMission): Point[] {
 
 export function deliveryFlowers(mission: RouteMission): Point[] {
   return pickSpots(mission, FLOWER_CANDIDATES, 2, [23, 20]);
+}
+
+/** Shared themed layout; legacy spot helpers remain until all scenes migrate. */
+export function deliveryDecor(mission: RouteMission, reserved: Box[] = []) {
+  const points = Object.values(mission.nodes);
+  const segments = mission.edges.map(([a, b]) => [mission.nodes[a], mission.nodes[b]] as [Point, Point]);
+  return planDecor({ game: 'delivery', key: mapKey(points, segments),
+    width: mission.width, height: mission.height, points, segments, reserved });
 }

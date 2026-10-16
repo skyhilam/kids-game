@@ -6,7 +6,7 @@ import { deliveryMission, generateDeliveryMission } from '../src/delivery/genera
 import { DELIVERY_MISSION } from '../src/delivery/mission';
 import { roadKey } from '../src/game/graph';
 import { checkRouteMove, createRouteState, findRouteSolution, moveOnRoute, type RouteMission, type RouteState } from '../src/game/routeMission';
-import { clearOfRoads, deliveryFlowers, deliveryTrees, distToSegment } from '../src/delivery/scenery';
+import { clearOfRoads, deliveryDecor, distToSegment } from '../src/delivery/scenery';
 import { followRouteStroke, junctionSlack, projectToRoad, traceAlongRoad } from '../src/game/trace';
 import type { Point } from '../src/game/types';
 
@@ -420,14 +420,19 @@ describe('delivery tap mode', () => {
 });
 
 describe('delivery scenery placement', () => {
-  it('keeps trees and flowers off generated roads and junctions', () => {
-    for (const seed of [1, 2, 7, 11, 19, 42, 91]) {
+  it('keeps themed decor boxes off generated roads and junctions', () => {
+    for (let seed = 0; seed < 20; seed += 1) {
       const mission = generateDeliveryMission(seed);
-      for (const [x, y] of deliveryTrees(mission)) {
-        expect(clearOfRoads(mission, x, y), `tree seed ${seed} at ${x},${y}`).toBe(true);
-      }
-      for (const [x, y] of deliveryFlowers(mission)) {
-        expect(clearOfRoads(mission, x + 23, y + 20), `flower seed ${seed} at ${x},${y}`).toBe(true);
+      const { items } = deliveryDecor(mission);
+      expect(items.length).toBeGreaterThan(0);
+      for (const item of items) {
+        // Every sampled point of the rendered box must retain the road clearance.
+        for (let dx = 0; dx <= 4; dx += 1) {
+          for (let dy = 0; dy <= 4; dy += 1) {
+            expect(clearOfRoads(mission, item.x + item.width * dx / 4,
+              item.y + item.height * dy / 4)).toBe(true);
+          }
+        }
       }
     }
     expect(distToSegment(0, 10, [0, 0], [100, 0])).toBe(10);

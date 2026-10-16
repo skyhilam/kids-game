@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 import type { SpriteName } from '../art/sprites';
+import type { DecorThemeId } from '../art/decorThemes';
+import { decorSprites, planDecor, type Box } from '../game/decor';
+import { mapKey } from '../game/geometry';
 import { carPose } from '../game/motion';
 import { picnicCollect } from '../picnic/board';
 import { SHOP_ART, shopArtOrigin } from '../picnic/art';
@@ -21,8 +24,8 @@ import {
   syncBoardSprite,
 } from './textures';
 
-const PICNIC_SPRITES = ['home', 'shop', 'burger', 'picnic', 'picnic-place', 'car-top', 'sun', 'tree', 'flower'] as const satisfies readonly SpriteName[];
-const TOOTH_SPRITES = ['tooth', 'toothbrush', 'bug-coral', 'bug-purple', 'kid', 'kid-cheer'] as const satisfies readonly SpriteName[];
+const PICNIC_SPRITES = ['home', 'shop', 'burger', 'picnic', 'picnic-place', 'car-top'] as const satisfies readonly SpriteName[];
+const TOOTH_SPRITES = ['tooth', 'bug-coral', 'bug-purple', 'kid', 'kid-cheer'] as const satisfies readonly SpriteName[];
 
 function facingLeft(angle: number): boolean {
   return Math.cos(angle * Math.PI / 180) < -0.1;
@@ -39,15 +42,19 @@ export class MazeScene extends Phaser.Scene {
 
   preload(): void {
     const model = this.read();
-    preloadBoardAtlases(this, model.theme === 'tooth' ? TOOTH_SPRITES : PICNIC_SPRITES);
+    preloadBoardAtlases(this, [...(model.theme === 'tooth' ? TOOTH_SPRITES : PICNIC_SPRITES), ...decorSprites(model.theme)]);
   }
 
   create(): void {
     const model = this.read();
-    registerAtlasFrames(this, model.theme === 'tooth' ? TOOTH_SPRITES : PICNIC_SPRITES);
+    registerAtlasFrames(this, [...(model.theme === 'tooth' ? TOOTH_SPRITES : PICNIC_SPRITES), ...decorSprites(model.theme)]);
     this.cameras.main.setBackgroundColor(model.theme === 'tooth' ? '#e7f2ee' : '#e4edd4');
     this.world = this.add.container(0, 0);
     this.scenery = this.add.graphics();
+    this.decor = this.add.container(0, 0);
+    this.art = new Map();
+    this.labels = new Map();
+    this.sceneryKey = '';
     this.roads = this.add.graphics();
     this.trails = this.add.graphics();
     this.marks = this.add.graphics();
@@ -57,16 +64,17 @@ export class MazeScene extends Phaser.Scene {
     this.pickup = this.add.text(0, 0, '已購得漢堡  ✓', {
       fontFamily: BOARD_FONT, fontSize: '14px', color: '#304b43', fontStyle: 'bold',
     }).setOrigin(0.5, 1).setVisible(false);
-    this.world.add([this.scenery, this.roads, this.trails, this.marks, this.parts, this.player, this.cargo, this.pickup]);
+    this.world.add([this.scenery, this.decor, this.roads, this.trails, this.marks, this.parts, this.player, this.cargo, this.pickup]);
     this.fitWorld(model);
-    this.drawBackdrop(model);
+    this.syncScenery(model);
     EventBus.emit('current-scene-ready', this);
   }
 
   update(time: number): void {
     const model = this.read();
     this.advanceFlight(model, time);
-    if (this.fitWorld(model)) this.drawBackdrop(model);
+    this.fitWorld(model);
+    this.syncScenery(model);
     drawMazeRoads(this.roads, model.graph, model.theme === 'tooth' ? { ...model.roads, center: '#c9ddd5' } : model.roads);
     drawMazeTrails(this.trails, model.graph, model.state, model.inFlight);
     this.syncLandmarks(model, time);
@@ -77,6 +85,10 @@ export class MazeScene extends Phaser.Scene {
 
   private world!: Phaser.GameObjects.Container;
   private scenery!: Phaser.GameObjects.Graphics;
+  private decor!: Phaser.GameObjects.Container;
+  private sceneryKey = '';
+  private decorTheme!: DecorThemeId;
+  private decorIds = new Set<string>();
   private roads!: Phaser.GameObjects.Graphics;
   private trails!: Phaser.GameObjects.Graphics;
   private marks!: Phaser.GameObjects.Graphics;
@@ -124,7 +136,37 @@ export class MazeScene extends Phaser.Scene {
     }
   }
 
-  private drawBackdrop(model: MazeBoardModel): void {
+  /** Cache geometry and landmark reservations; gameplay updates never re-plan decor. */
+  private syncScenery(model: MazeBoardModel): void {
+    const { graph, width, height } = model;
+    const points = Object.values(graph.nodes);
+    const segments = graph.edges.map((edge) => edge.points);
+    const key = mapKey(points, segments);
+    const sceneryKey = `${model.theme}|${width}x${height}|${key}|${graph.start}|${graph.goal}|${graph.collect}`;
+    if (sceneryKey === this.sceneryKey) return;
+    this.sceneryKey = sceneryKey;
+    const goal = graph.nodes[graph.goal];
+    const reserved: Box[] = [];
+    if (model.theme === 'picnic') {
+      const start = graph.nodes[graph.start];
+      const shop = shopArtOrigin(graph.nodes[picnicCollect(graph)]);
+      reserved.push(
+        { x: start[0] - 58, y: start[1] - 130, width: 116, height: 106 },
+        { x: shop[0], y: shop[1], width: SHOP_ART.width, height: SHOP_ART.height },
+        { x: Math.min(goal[0] - 95, width - 210), y: goal[1] + 9, width: 200, height: 104 },
+      );
+    } else {
+      reserved.push({ x: goal[0] - 51, y: goal[1] - 125, width: 102, height: 96 });
+    }
+    const plan = planDecor({ game: model.theme, key, width, height, points, segments, reserved });
+    this.decorTheme = plan.theme;
+    this.decorIds = new Set<string>();
+    for (const item of plan.items) {
+      const id = `decor-${item.id}`;
+      this.decorIds.add(id);
+      this.sprite(id, item.name, item.x, item.y, item.width, item.height);
+    }
+    this.hideUnused('decor-', this.decorIds);
     if (model.theme === 'tooth') drawToothScenery(this.scenery, model.width, model.height);
     else drawPicnicScenery(this.scenery, model.width, model.height);
   }
@@ -133,7 +175,7 @@ export class MazeScene extends Phaser.Scene {
     let sprite = this.art.get(id);
     if (!sprite) {
       sprite = addBoardSprite(this, name, x, y, width, height, origin);
-      this.parts.add(sprite);
+      (id.startsWith('decor-') ? this.decor : this.parts).add(sprite);
       this.art.set(id, sprite);
     } else {
       sprite.setTexture(atlasKey(name), name);
@@ -166,7 +208,7 @@ export class MazeScene extends Phaser.Scene {
 
   private syncLandmarks(model: MazeBoardModel, time: number): void {
     this.marks.clear();
-    const keep = new Set<string>();
+    const keep = new Set(this.decorIds);
     if (model.theme === 'picnic') this.picnicMarks(model, keep);
     else this.toothMarks(model, time, keep);
     this.hideUnused('', keep);
@@ -183,13 +225,6 @@ export class MazeScene extends Phaser.Scene {
       keep.add(id);
       this.sprite(id, name, x, y, width, height);
     };
-    wiggle('sun', 'sun', 726 / 840 * model.width, 33 / 660 * model.height, 80, 80);
-    wiggle('tree-a', 'tree', 20 / 840 * model.width, 188 / 660 * model.height, 76, 97);
-    wiggle('tree-b', 'tree', 748 / 840 * model.width, 309 / 660 * model.height, 80, 108);
-    wiggle('tree-c', 'tree', 21 / 840 * model.width, 544 / 660 * model.height, 66, 88);
-    wiggle('flower-a', 'flower', 265 / 840 * model.width, 238 / 660 * model.height, 29, 35);
-    wiggle('flower-b', 'flower', 330 / 840 * model.width, 574 / 660 * model.height, 30, 36);
-    wiggle('flower-c', 'flower', 533 / 840 * model.width, 437 / 660 * model.height, 28, 34);
     wiggle('home', 'home', start[0] - 58, start[1] - 130, 116, 106);
     this.label('start-title', start[0] + 61, start[1] - 29, graph.titles[graph.start], '#fff5e7', '#efc9b1', '#c27c5a');
     keep.add('start-title');
@@ -253,10 +288,6 @@ export class MazeScene extends Phaser.Scene {
     this.sprite('tooth', 'tooth', goal[0] - 51, goal[1] - 125, 102, 96).setAlpha(0.75 + glow * 0.25);
     this.label('goal-title', Math.min(goal[0] + 52, model.width - 31), goal[1] + 6, graph.titles[graph.goal], '#eef6ed', '#aec9bc', '#658d7e');
     keep.add('goal-title');
-    keep.add('brush-a');
-    keep.add('brush-b');
-    this.sprite('brush-a', 'toothbrush', 38 / 840 * model.width, 39 / 660 * model.height, 36, 72).setAlpha(0.72);
-    this.sprite('brush-b', 'toothbrush', 762 / 840 * model.width, 530 / 660 * model.height, 32, 68).setAlpha(0.65);
     graph.hazards.forEach((id, index) => {
       const [x, y] = graph.nodes[id];
       this.marks.fillStyle(rgb('#b7858d'), 0.16);
@@ -318,6 +349,7 @@ export class MazeScene extends Phaser.Scene {
     const host = this.game.canvas.parentElement;
     if (!host) return;
     host.dataset.phaserReady = 'true';
+    host.dataset.decorTheme = this.decorTheme;
     const name = model.theme === 'tooth' ? (model.state.won ? 'kid-cheer' : 'kid') : 'car-top';
     host.dataset.playerSprite = name;
     const animated = this.player.anims.isPlaying;
