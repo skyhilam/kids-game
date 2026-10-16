@@ -38,8 +38,49 @@ function waitForServer() {
   });
 }
 
+// Read the mounted Phaser instance through Vue's rendered vnode tree. Board art
+// and roads are canvas objects now, rather than the old SVG data attributes.
+function renderedBoard() {
+  const visit = (vnode) => {
+    if (!vnode) return null;
+    const game = vnode.component?.exposed?.game?.();
+    if (game) return game;
+    const nested = visit(vnode.component?.subTree);
+    if (nested) return nested;
+    for (const child of Array.isArray(vnode.children) ? vnode.children : []) {
+      const found = visit(child);
+      if (found) return found;
+    }
+    return null;
+  };
+  const game = visit(document.querySelector('#app')._vnode);
+  const scene = game?.scene.scenes[0];
+  if (!scene?.world || game.canvas.parentElement?.dataset.phaserReady !== 'true') return null;
+  const sprites = [];
+  const walk = (object) => {
+    if (object.frame) sprites.push({ name: object.frame.name, visible: object.visible });
+    for (const child of object.list ?? []) walk(child);
+  };
+  walk(scene.world);
+  const model = game.registry.get('readModel')();
+  return {
+    sprites,
+    graph: model.graph && { nodes: model.graph.nodes, edges: model.graph.edges },
+    mission: model.mission,
+    node: model.state.node,
+    delivered: model.state.done?.size,
+  };
+}
+
+async function boardSnapshot(page) {
+  await page.waitForFunction(renderedBoard);
+  return page.evaluate(renderedBoard);
+}
+
 async function spriteNames(page) {
-  return page.locator('[data-sprite]').evaluateAll((nodes) => nodes.map((node) => node.dataset.sprite));
+  const board = await boardSnapshot(page);
+  const dom = await page.locator('[data-sprite]').evaluateAll((nodes) => nodes.map((node) => node.dataset.sprite));
+  return [...dom, ...board.sprites.map((sprite) => sprite.name)];
 }
 
 async function openHub(page) {
@@ -101,9 +142,7 @@ async function followHintsToWin(page) {
 }
 
 async function mapFingerprint(page) {
-  return page.evaluate(() => [...document.querySelectorAll('.road-center')]
-    .map((path) => path.getAttribute('d'))
-    .join(';'));
+  return JSON.stringify((await boardSnapshot(page)).graph);
 }
 
 async function deliverUntilFirstHouse(page) {
@@ -112,7 +151,12 @@ async function deliverUntilFirstHouse(page) {
     const score = await page.locator('.delivery-manifest-label strong').innerText();
     if (score.trim().startsWith('1')) {
       if (await page.getByText('貼包裹').count()) throw new Error('stamp button still shown after arrival');
-      if (await page.locator('[data-delivered]').count() < 1) throw new Error('no house sticker after arrival');
+      await page.waitForFunction(() => document.querySelector('.delivery-stops li.delivered'));
+      await page.waitForFunction(`(() => { const board = (${renderedBoard.toString()})(); return board?.sprites.some((sprite) => sprite.name === 'parcel' && sprite.visible); })()`);
+      const board = await boardSnapshot(page);
+      if (!board.delivered || !board.sprites.some((sprite) => sprite.name === 'parcel' && sprite.visible)) {
+        throw new Error('no house sticker after arrival');
+      }
       return;
     }
     await page.getByRole('button', { name: '提示' }).click();
@@ -129,16 +173,7 @@ async function deliverUntilFirstHouse(page) {
 }
 
 async function deliveryFingerprint(page) {
-  return page.evaluate(() => {
-    const roads = [...document.querySelectorAll('.delivery-road')]
-      .map((path) => path.getAttribute('d'))
-      .sort()
-      .join(';');
-    const start = document.querySelector('[data-delivery-start]')?.getAttribute('transform');
-    const finish = document.querySelector('[data-delivery-finish]')?.getAttribute('transform');
-    const houses = [...document.querySelectorAll('[data-house]')].map((node) => node.getAttribute('transform'));
-    return `${roads}|${start}|${finish}|${houses.join('|')}`;
-  });
+  return JSON.stringify((await boardSnapshot(page)).mission);
 }
 
 async function playFromFirstMap(page) {
@@ -147,7 +182,7 @@ async function playFromFirstMap(page) {
   if (!badge.includes('第 1 關')) throw new Error(`expected 第 1 關, got ${badge}`);
   if (await page.locator('.level-dots').count()) throw new Error('endless maps should not show finite level dots');
   const fingerprint = await mapFingerprint(page);
-  await page.click('button[aria-label="遊戲說明與關卡選擇"]');
+  await page.click('button[aria-label="遊戲說明"]');
   await page.getByRole('heading', { name: '遊戲說明' }).waitFor();
   if (await page.locator('.help-levels').count()) {
     throw new Error('help should not list fixed opening maps');
@@ -226,12 +261,12 @@ async function runFormulaRestStop(page) {
     await page.getByRole('button', { name: '貼紙學單字' }).click();
     await page.locator('#sticker-dialog-title', { hasText: '貼紙學單字' }).waitFor();
     await page.getByRole('button', { name: '開始遊戲' }).waitFor();
-    await page.locator('.top-actions').getByRole('button', { name: '選擇遊戲' }).click();
+    await page.locator('dialog[open]').getByRole('button', { name: '選擇遊戲' }).click();
     await page.getByRole('heading', { name: '選擇遊戲' }).waitFor();
     await page.getByRole('button', { name: '聽一聽揀圖' }).click();
     await page.locator('#listen-dialog-title', { hasText: '聽一聽揀圖' }).waitFor();
     await page.getByRole('button', { name: '開始遊戲' }).waitFor();
-    await page.locator('.top-actions').getByRole('button', { name: '選擇遊戲' }).click();
+    await page.locator('dialog[open]').getByRole('button', { name: '選擇遊戲' }).click();
     await page.getByRole('heading', { name: '選擇遊戲' }).waitFor();
     if (errors.length) throw new Error(`formula page errors: ${errors.join(' | ')}`);
     log('formula island: 8 zones, zone 1 open, zone 2 locked; sticker and listen still open; errors=0');
@@ -306,10 +341,10 @@ async function runRotationRegression(page) {
       await page.locator('.step-target.hinted').click();
       await page.setViewportSize(size); // rotate during the movement animation
       await page.waitForFunction(() => !document.querySelector('.board.moving'));
-      if (await page.locator('#nextBtn').isVisible()) await page.click('#nextBtn');
+      if (await page.locator('#nextBtn').count()) await page.click('#nextBtn');
       await waitPlayable(page);
       await page.waitForFunction(() => document.querySelectorAll('.phaser-board canvas').length === 1);
-      await page.click('button[aria-label="遊戲說明與關卡選擇"]');
+      await page.click('button[aria-label="遊戲說明"]');
       await page.setViewportSize({ width: size.height, height: size.width });
       await page.click('#backToGame');
       await waitPlayable(page);
@@ -373,7 +408,7 @@ async function runRotationRegression(page) {
     await goHome(page);
     for (let i = 0; i < 4; i += 1) {
       await page.getByRole('button', { name: '一起去野餐 先到漢堡店，再前往公園。' }).click();
-      await page.locator('.top-actions').getByRole('button', { name: '選擇遊戲' }).click();
+      await page.locator('dialog[open]').getByRole('button', { name: '選擇遊戲' }).click();
     }
     await page.waitForFunction(() => document.querySelectorAll('.phaser-board canvas').length === 0);
     if (errors.length) throw new Error(errors.join(' | '));
