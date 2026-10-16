@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { distToSegment } from '../src/game/geometry';
 import { createGame, findSolution } from '../src/game/rules';
 import { picnicLevel, LEVELS } from '../src/picnic/levels';
 import { toothLevel, TOOTH_LEVELS } from '../src/tooth/levels';
@@ -67,14 +68,6 @@ describe('endless maze maps', () => {
   });
 
   it('keeps tooth bugs off other roads so they stand on their own junction', () => {
-    const distToSegment = (px: number, py: number, a: readonly number[], b: readonly number[]) => {
-      const dx = b[0]! - a[0]!;
-      const dy = b[1]! - a[1]!;
-      const len2 = dx * dx + dy * dy;
-      if (len2 < 1) return Math.hypot(px - a[0]!, py - a[1]!);
-      const t = Math.max(0, Math.min(1, ((px - a[0]!) * dx + (py - a[1]!) * dy) / len2));
-      return Math.hypot(px - (a[0]! + dx * t), py - (a[1]! + dy * t));
-    };
     for (const seed of [0, 7, 11, 42, 4242]) {
       for (let index = 0; index < 20; index += 1) {
         const { graph } = createGame((i) => toothLevel(i, seed), index);

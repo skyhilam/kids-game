@@ -25,14 +25,18 @@ function verify(options: DecorOptions) {
       expect(overlaps(box, other)).toBe(false);
     }
     // Independently sample the complete box, including its interior and boundary.
+    let nearestPoint = Infinity;
+    let nearestRoad = Infinity;
     for (let ix = 0; ix <= 10; ix += 1) {
       for (let iy = 0; iy <= 10; iy += 1) {
         const x = box.x + box.width * ix / 10;
         const y = box.y + box.height * iy / 10;
-        for (const p of options.points) expect(Math.hypot(x - p[0], y - p[1])).toBeGreaterThanOrEqual(58 - 1e-9);
-        for (const [a, b] of options.segments) expect(distToSegment(x, y, a, b)).toBeGreaterThanOrEqual(58 - 1e-9);
+        for (const p of options.points) nearestPoint = Math.min(nearestPoint, Math.hypot(x - p[0], y - p[1]));
+        for (const [a, b] of options.segments) nearestRoad = Math.min(nearestRoad, distToSegment(x, y, a, b));
       }
     }
+    expect(nearestPoint, `${box.id} near node`).toBeGreaterThanOrEqual(58 - 1e-9);
+    expect(nearestRoad, `${box.id} near road`).toBeGreaterThanOrEqual(58 - 1e-9);
   }
   return result;
 }
