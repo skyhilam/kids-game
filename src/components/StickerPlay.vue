@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { usePlayAudio } from '../composables/usePlayAudio';
 import { cancelSpeech, initAudio, playCue, speakEnglish } from '../game/audio';
 import { randomSeed } from '../game/rng';
@@ -98,6 +98,7 @@ function unbindDrag(): void {
 }
 
 function onDown(event: PointerEvent, id: WordId): void {
+  if (!event.isPrimary || event.button !== 0) { cancelDrag(); return; }
   if (!playing.value) return;
   event.preventDefault();
   drag.value = {
@@ -160,11 +161,22 @@ function onUp(event: PointerEvent): void {
   finishDrag(event);
 }
 
+function cancelDrag(): void {
+  drag.value = null;
+  unbindDrag();
+}
+
+function onWindowPointer(event: PointerEvent): void {
+  if (!event.isPrimary) cancelDrag();
+}
+
 function onCancel(event: PointerEvent): void {
   if (!drag.value || drag.value.pointerId !== event.pointerId) return;
   drag.value = null;
   unbindDrag();
 }
+
+watch(playing, (enabled) => { if (!enabled) cancelDrag(); }, { flush: 'sync' });
 
 function beginPlay(): void {
   overlay.value = null;
@@ -217,8 +229,15 @@ function isAway(word: WordId): boolean {
   return Boolean(slotOf(placed, word)) && drag.value?.id !== word;
 }
 
+onMounted(() => {
+  window.addEventListener('resize', cancelDrag);
+  window.addEventListener('pointerdown', onWindowPointer, true);
+});
+
 onUnmounted(() => {
-  unbindDrag();
+  cancelDrag();
+  window.removeEventListener('resize', cancelDrag);
+  window.removeEventListener('pointerdown', onWindowPointer, true);
   window.clearTimeout(shakeTimer);
   clearConfetti();
 });

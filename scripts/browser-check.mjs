@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -291,12 +292,108 @@ async function runActivities(page) {
   log('activities: hub, tooth, delivery ok');
 }
 
-const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
+async function runRotationRegression(page) {
+  const errors = [];
+  const onError = (error) => errors.push(String(error));
+  page.on('pageerror', onError);
+  const sizes = [{ width: 390, height: 844 }, { width: 844, height: 390 },
+    { width: 768, height: 1024 }, { width: 1024, height: 768 }, { width: 580, height: 900 }];
+  try {
+    await openHub(page);
+    await startPicnic(page);
+    for (const size of sizes) {
+      await page.locator('.action-button.hint:not([disabled])').click();
+      await page.locator('.step-target.hinted').click();
+      await page.setViewportSize(size); // rotate during the movement animation
+      await page.waitForFunction(() => !document.querySelector('.board.moving'));
+      if (await page.locator('#nextBtn').isVisible()) await page.click('#nextBtn');
+      await waitPlayable(page);
+      await page.waitForFunction(() => document.querySelectorAll('.phaser-board canvas').length === 1);
+      await page.click('button[aria-label="遊戲說明與關卡選擇"]');
+      await page.setViewportSize({ width: size.height, height: size.width });
+      await page.click('#backToGame');
+      await waitPlayable(page);
+    }
+    await goHome(page);
+    await page.getByRole('button', { name: '送貨員來了 送到三間屋，再到終點。' }).click();
+    await page.getByRole('button', { name: '開始送貨' }).click();
+    await deliverUntilFirstHouse(page);
+    for (const size of sizes) {
+      await page.setViewportSize(size);
+      const first = page.locator('.delivery-target:not([aria-label*="藍色終點"])').first();
+      const startStyle = await first.getAttribute('style');
+      await first.click();
+      const next = page.locator('.delivery-target:not([aria-label*="藍色終點"])').first();
+      const destination = await next.getAttribute('data-node');
+      const endStyle = await next.getAttribute('style');
+      await page.getByRole('button', { name: '畫線走路' }).click();
+      await page.locator('.delivery-board').scrollIntoViewIfNeeded();
+      const board = await page.locator('.delivery-board').boundingBox();
+      const point = (style) => {
+        const left = Number(style.match(/left:\s*([\d.]+)%/)[1]);
+        const top = Number(style.match(/top:\s*([\d.]+)%/)[1]);
+        return { x: board.x + board.width * left / 100, y: board.y + board.height * top / 100 };
+      };
+      const from = point(startStyle);
+      const to = point(endStyle);
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move(to.x, to.y, { steps: 30 });
+      await page.mouse.up();
+      await page.getByRole('button', { name: '點選路口' }).click();
+      if (await page.locator(`.delivery-target[data-node="${destination}"]`).count()) {
+        throw new Error('delivery trace did not reach the next node after rotation');
+      }
+    }
+    await goHome(page);
+    await page.getByRole('button', { name: '貼紙學單字' }).click();
+    await page.getByRole('button', { name: '開始遊戲' }).click();
+    for (const size of sizes.slice(0, 3)) {
+      const chip = page.locator('.sticker-chip').first();
+      const id = await chip.getAttribute('data-sticker');
+      const box = await chip.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.setViewportSize(size);
+      await page.mouse.up();
+      if (await page.locator('.sticker-float').count()) throw new Error('stale sticker drag after resize');
+      const source = page.locator(`[data-sticker="${id}"]`).first();
+      const target = page.locator(`[data-word-slot="${id}"]`);
+      await source.scrollIntoViewIfNeeded();
+      const from = await source.boundingBox();
+      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+      await page.mouse.down();
+      await target.scrollIntoViewIfNeeded();
+      const to = await target.boundingBox();
+      await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+      await page.mouse.up();
+      await page.locator(`[data-placed="${id}"]`).waitFor();
+      if (await page.locator('.sticker-chip').count() === 0) break;
+    }
+    await goHome(page);
+    for (let i = 0; i < 4; i += 1) {
+      await page.getByRole('button', { name: '一起去野餐 先到漢堡店，再前往公園。' }).click();
+      await page.locator('.top-actions').getByRole('button', { name: '選擇遊戲' }).click();
+    }
+    await page.waitForFunction(() => document.querySelectorAll('.phaser-board canvas').length === 0);
+    if (errors.length) throw new Error(errors.join(' | '));
+    log('rotation: same page, animated moves, delivery, sticker cancellation/drop, dialogs and rapid switching; errors=0');
+  } finally { page.off('pageerror', onError); }
+}
+
+const preview = spawn(process.execPath, [join(root, 'node_modules/vite/bin/vite.js'), 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
   cwd: root,
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 preview.stdout.on('data', (buf) => log(`[preview] ${buf.toString().trim()}`));
 preview.stderr.on('data', (buf) => log(`[preview:err] ${buf.toString().trim()}`));
+
+async function stopPreview() {
+  if (preview.exitCode !== null || preview.signalCode !== null) return;
+  const exited = once(preview, 'exit');
+  preview.kill();
+  await exited;
+}
 
 let browser;
 try {
@@ -325,6 +422,7 @@ try {
   log('desktop tooth: first map then 第 2 關 playable');
   await goHome(page);
   await runFormulaRestStop(page);
+  await runRotationRegression(page);
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await openHub(mobile);
@@ -348,11 +446,11 @@ try {
 } catch (err) {
   log(`FAILED: ${err instanceof Error ? err.stack || err.message : err}`);
   writeFileSync(join(outDir, 'browser.log'), logLines.join('\n') + '\n');
-  preview.kill();
+  await stopPreview();
   if (browser) await browser.close();
   process.exit(1);
 }
 writeFileSync(join(outDir, 'browser.log'), logLines.join('\n') + '\n');
 if (browser) await browser.close();
-preview.kill();
+await stopPreview();
 process.exit(0);

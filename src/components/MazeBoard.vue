@@ -110,6 +110,7 @@ const { onPointerDown, onPointerUp, onPointerCancel } = useBoardInput({
       @pointerdown="onPointerDown"
       @pointerup="onPointerUp"
       @pointercancel="onPointerCancel"
+      @lostpointercapture="onPointerCancel"
     >
       <PhaserGame :key="`${theme}-${size.width}x${size.height}`" :model="model" />
       <slot name="note">

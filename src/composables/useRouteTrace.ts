@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
 import { roadKey } from '../game/graph';
 import { checkRouteMove, routeNeighbors, type RouteFailure, type RouteMission, type RouteState } from '../game/routeMission';
 import { continueAlong, followRouteStroke, type RoadTrace } from '../game/trace';
@@ -23,9 +23,11 @@ export function useRouteTrace(options: {
     return [from[0] + (to[0] - from[0]) * trace.value.t, from[1] + (to[1] - from[1]) * trace.value.t];
   });
 
-  function pointerPoint(event: PointerEvent): Point {
-    const el = options.surface.value!;
+  function pointerPoint(event: PointerEvent): Point | null {
+    const el = options.surface.value;
+    if (!el) return null;
     const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
     const mission = options.mission();
     return [
       (event.clientX - rect.left) / rect.width * mission.width,
@@ -49,8 +51,10 @@ export function useRouteTrace(options: {
   function reset(): void { stopPointer(); trace.value = null; needsReturn = false; drawing = false; }
 
   function onPointerDown(event: PointerEvent): void {
-    if (!options.enabled() || !event.isPrimary || event.button !== 0) return;
+    if (!event.isPrimary) { reset(); return; }
+    if (!options.enabled() || event.button !== 0) return;
     const point = pointerPoint(event);
+    if (!point) { reset(); return; }
     if (Math.hypot(point[0] - position.value[0], point[1] - position.value[1]) > tolerance() * 1.7) {
       options.feedback('start-at-truck');
       return;
@@ -64,9 +68,11 @@ export function useRouteTrace(options: {
 
   function onPointerMove(event: PointerEvent): void {
     if (pointerId !== event.pointerId || !options.enabled()) return;
+    const point = pointerPoint(event);
+    if (!point) { reset(); return; }
     const mission = options.mission();
     const result = followRouteStroke({
-      pointer: pointerPoint(event),
+      pointer: point,
       trace: trace.value,
       needsReturn,
       node: options.state().node,
@@ -102,6 +108,17 @@ export function useRouteTrace(options: {
     stopPointer();
   }
 
-  watch(options.enabled, (enabled) => { if (!enabled) stopPointer(); });
-  return { trace, position, reset, onPointerDown, onPointerMove, onPointerUp, stopPointer };
+  function onWindowPointer(event: PointerEvent): void { if (!event.isPrimary) reset(); }
+  onMounted(() => {
+    window.addEventListener('resize', reset);
+    window.addEventListener('pointerdown', onWindowPointer, true);
+  });
+  onUnmounted(() => {
+    reset();
+    window.removeEventListener('resize', reset);
+    window.removeEventListener('pointerdown', onWindowPointer, true);
+  });
+  watch(options.mission, reset, { flush: 'sync' });
+  watch(options.enabled, (enabled) => { if (!enabled) reset(); }, { flush: 'sync' });
+  return { trace, position, reset, onPointerDown, onPointerMove, onPointerUp, stopPointer: reset };
 }

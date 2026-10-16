@@ -9,6 +9,7 @@ const props = defineProps<{
 
 const host = ref<HTMLDivElement | null>(null);
 const scene = ref<unknown>(null);
+let disposed = false;
 let game: { destroy: (removeCanvas: boolean) => void } | null = null;
 
 function onReady(instance: unknown): void {
@@ -17,12 +18,13 @@ function onReady(instance: unknown): void {
 
 onMounted(async () => {
   const { startBoardGame } = await import('./main');
-  if (!host.value) return;
+  if (disposed || !host.value) return;
   EventBus.on('current-scene-ready', onReady);
   game = startBoardGame(host.value, () => props.model);
 });
 
 onUnmounted(() => {
+  disposed = true;
   EventBus.off('current-scene-ready', onReady);
   game?.destroy(true);
   game = null;

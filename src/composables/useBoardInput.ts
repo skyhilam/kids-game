@@ -39,12 +39,14 @@ export function useBoardInput(opts: {
     if (choice && choice.score > 0.7) opts.onMove(choice.to);
   }
 
-  function onPointerDownWindow(): void {
+  function onPointerDownWindow(event: PointerEvent): void {
+    if (!event.isPrimary) onPointerCancel();
     keyboardMode.value = false;
   }
 
   function onPointerDown(event: PointerEvent): void {
     keyboardMode.value = false;
+    if (!event.isPrimary || event.button !== 0) { onPointerCancel(); return; }
     if ((event.target as HTMLElement).closest('button') || !opts.interactive()) return;
     const board = opts.boardEl.value;
     if (!board) return;
@@ -52,11 +54,12 @@ export function useBoardInput(opts: {
     const state = opts.state();
     const size = mapSize(opts.narrow());
     const rect = board.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
     const [x, y] = eventToMap(event, rect);
     const [cx, cy] = graph.nodes[state.node];
     if (Math.hypot(x - cx, y - cy) < Math.max(60, 38 / rect.width * size.width)) {
       pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
-      board.setPointerCapture(event.pointerId);
+      try { board.setPointerCapture(event.pointerId); } catch { /* synthetic pointer */ }
     } else {
       const nearest = nearestNeighbor(
         graph,
@@ -73,7 +76,7 @@ export function useBoardInput(opts: {
     if (!pointerStart || pointerStart.id !== event.pointerId) return;
     const dx = event.clientX - pointerStart.x;
     const dy = event.clientY - pointerStart.y;
-    pointerStart = null;
+    onPointerCancel();
     if (!opts.interactive() || Math.hypot(dx, dy) < 20) return;
     const state = opts.state();
     const best = bestNeighbor(opts.graph(), state.node, state.used, [dx, dy]);
@@ -81,8 +84,13 @@ export function useBoardInput(opts: {
   }
 
   function onPointerCancel(): void {
+    const id = pointerStart?.id;
     pointerStart = null;
+    const board = opts.boardEl.value;
+    if (id !== undefined && board?.hasPointerCapture(id)) board.releasePointerCapture(id);
   }
+
+  watch(opts.interactive, (enabled) => { if (!enabled) onPointerCancel(); }, { flush: 'sync' });
 
   watch(opts.inFlight, (cur, prev) => {
     if (!keyboardMode.value || cur || !prev) return;
@@ -90,11 +98,14 @@ export function useBoardInput(opts: {
   });
 
   onMounted(() => {
+    window.addEventListener('resize', onPointerCancel);
     window.addEventListener('keydown', onKey);
     window.addEventListener('pointerdown', onPointerDownWindow, { passive: true });
   });
 
   onUnmounted(() => {
+    onPointerCancel();
+    window.removeEventListener('resize', onPointerCancel);
     window.removeEventListener('keydown', onKey);
     window.removeEventListener('pointerdown', onPointerDownWindow);
   });

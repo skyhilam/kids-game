@@ -106,6 +106,30 @@ describe('game session (two-axis overlay)', () => {
     vi.unstubAllGlobals();
   });
 
+  it('applies a pending breakpoint immediately after flight and preserves progress across repeated rotations', () => {
+    const session = picnicSession();
+    session.welcomeStart();
+    session.completed.value.add(3);
+    session.requestMove('a');
+    window.innerWidth = 390;
+    session.applyLayout();
+    expect(session.narrow.value).toBe(false);
+    flushFrames();
+    expect(session.narrow.value).toBe(true);
+    expect(session.game.node).toBe('a');
+    const used = [...session.game.used];
+    for (const width of [580, 1024, 768, 390, 844]) {
+      window.innerWidth = width;
+      session.applyLayout();
+      expect(session.game.level).toBe(0);
+      expect(session.game.node).toBe('a');
+      expect([...session.game.used]).toEqual(used);
+      expect(session.completed.value.has(3)).toBe(true);
+    }
+    expect(session.requestMove(session.graph.value.collect!).ok).toBe(true);
+    flushFrames();
+  });
+
   it('starts on welcome and only then becomes interactive', () => {
     const session = picnicSession();
     expect(session.overlay.value).toEqual({ kind: 'welcome' });

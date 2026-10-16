@@ -168,6 +168,7 @@ export function useGameSession(hooks: {
       overlay.value = { kind: 'stuck', reason: result.stalled };
     }
     inFlight.value = null;
+    applyLayout();
     const arrived = copy.arrivalGuide(graph.value, result, game.used);
     guideMain.value = arrived.main;
     guideSub.value = arrived.sub;
