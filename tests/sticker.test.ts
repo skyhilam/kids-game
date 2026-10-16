@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { sprites } from '../src/art/sprites';
 import { mazeLoadBand, parentCopy, stickerLoadBand, STAGE_LABEL } from '../src/game/stages';
+import { WORD_BANK } from '../src/sticker/wordBank';
 import { STICKER_COPY } from '../src/sticker/copy';
 import {
   BASIC_POOL,
@@ -16,6 +17,7 @@ import {
   rollRecent,
   slotOf,
   STICKER_POOL,
+  STICKER_LOAD_COUNT,
   stickerWordCount,
   tryPlace,
   WORD_EN,
@@ -27,64 +29,58 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const claims = /貼紙冊|100 枚|智商|智力|大腦/;
 
 describe('sticker word list and deal', () => {
-  it('uses existing sprites, including hyphenated ids mapped to English words', () => {
-    expect(WORD_IDS).toHaveLength(24);
-    expect([...WORD_IDS]).toEqual([
-      'burger', 'car', 'home', 'tree', 'flower', 'sun',
-      'truck', 'parcel', 'bear', 'shop', 'park', 'picnic',
-      'kid', 'tooth', 'toothbrush', 'bug-coral',
-      'dog', 'cat', 'chicken', 'duck', 'cow', 'pig', 'sheep', 'horse',
-    ]);
-    for (const extra of ['car-top', 'truck-top', 'kid-cheer', 'courier', 'bug-purple'] as const) {
-      expect(WORD_IDS).not.toContain(extra);
-    }
-    for (const id of WORD_IDS) {
+  it('derives unique spoken labels and sprite ids from the word bank', () => {
+    expect(WORD_IDS).toEqual(WORD_BANK.map(({ id }) => id));
+    expect(new Set(WORD_IDS).size).toBe(WORD_IDS.length);
+    for (const { id, en, zh } of WORD_BANK) {
       expect(sprites).toHaveProperty(id);
-      expect(WORD_ZH[id]).toBeTruthy();
-      expect(WORD_EN[id]).toBeTruthy();
-      expect(WORD_EN[id]).not.toMatch(/-/);
+      expect(en.trim()).not.toBe('');
+      expect(zh.trim()).not.toBe('');
+      expect(en).not.toContain('-');
+      expect(zh).not.toContain('-');
+      expect(WORD_EN[id]).toBe(en);
+      expect(WORD_ZH[id]).toBe(zh);
     }
-    expect(WORD_EN['bug-coral']).toBe('bug');
-    expect(WORD_ZH['bug-coral']).toBe('蟲');
-    expect(WORD_ZH.dog).toBe('狗');
-    expect(WORD_EN.dog).toBe('dog');
-    expect(WORD_ZH.cat).toBe('貓');
-    expect(WORD_EN.cat).toBe('cat');
-    expect(WORD_ZH.chicken).toBe('雞');
-    expect(WORD_EN.chicken).toBe('chicken');
-    expect(WORD_ZH.duck).toBe('鴨');
-    expect(WORD_EN.duck).toBe('duck');
-    expect(WORD_ZH.cow).toBe('牛');
-    expect(WORD_EN.cow).toBe('cow');
-    expect(WORD_ZH.pig).toBe('豬');
-    expect(WORD_EN.pig).toBe('pig');
-    expect(WORD_ZH.sheep).toBe('羊');
-    expect(WORD_EN.sheep).toBe('sheep');
-    expect(WORD_ZH.horse).toBe('馬');
-    expect(WORD_EN.horse).toBe('horse');
     expect(new Set(Object.values(WORD_EN)).size).toBe(WORD_IDS.length);
+    expect(new Set(Object.values(WORD_ZH)).size).toBe(WORD_IDS.length);
+    expect(WORD_EN['tyrannosaurus']).toBe('dinosaur');
+    const themes = new Set<string>(WORD_IDS.map((id) => sprites[id].atlas));
+    for (const theme of ['farm', 'ocean', 'garden', 'restaurant', 'groceries', 'music', 'space', 'city', 'construction', 'station', 'prehistoric']) {
+      expect(themes.has(theme)).toBe(true);
+    }
   });
 
-  it('nests load-band pools as easy ⊂ basic ⊂ puzzle = WORD_IDS', () => {
-    expect(EASY_POOL).toHaveLength(8);
-    expect(BASIC_POOL).toHaveLength(16);
-    expect(PUZZLE_POOL).toHaveLength(24);
+  it('keeps the original sixteen words, labels, and introduction bands', () => {
+    const originals = [
+      ['sun', 'sun', '太陽', 'easy'], ['car', 'car', '小車', 'easy'],
+      ['home', 'home', '房子', 'easy'], ['tree', 'tree', '樹', 'easy'],
+      ['flower', 'flower', '花', 'easy'], ['bear', 'bear', '小熊', 'easy'],
+      ['kid', 'kid', '小朋友', 'easy'], ['park', 'park', '公園', 'easy'],
+      ['burger', 'burger', '漢堡', 'basic'], ['shop', 'shop', '商店', 'basic'],
+      ['truck', 'truck', '貨車', 'basic'], ['picnic', 'picnic', '野餐', 'basic'],
+      ['parcel', 'parcel', '包裹', 'puzzle'], ['tooth', 'tooth', '牙齒', 'puzzle'],
+      ['toothbrush', 'toothbrush', '牙刷', 'puzzle'], ['bug-coral', 'bug', '蟲', 'puzzle'],
+    ] as const;
+    for (const [id, en, zh, band] of originals) {
+      expect(WORD_BANK).toContainEqual({ id, en, zh, band });
+    }
+  });
+
+  it('expands ordered nested pools to at least 16/32/48 words with enough for every deal', () => {
+    const bands = ['easy', 'basic', 'puzzle'] as const;
+    const minimums = [16, 32, 48];
+    for (const [index, band] of bands.entries()) {
+      const pool = STICKER_POOL[band];
+      expect(pool.length).toBeGreaterThanOrEqual(minimums[index]!);
+      expect(pool.length).toBeGreaterThanOrEqual(STICKER_LOAD_COUNT[band]);
+      expect(pool).toEqual(WORD_BANK.filter((entry) => bands.indexOf(entry.band) <= index).map(({ id }) => id));
+    }
     expect(STICKER_POOL.easy).toEqual(EASY_POOL);
     expect(STICKER_POOL.basic).toEqual(BASIC_POOL);
     expect(STICKER_POOL.puzzle).toEqual(PUZZLE_POOL);
     expect(EASY_POOL.every((id) => BASIC_POOL.includes(id))).toBe(true);
     expect(BASIC_POOL.every((id) => PUZZLE_POOL.includes(id))).toBe(true);
-    expect(new Set(PUZZLE_POOL)).toEqual(new Set(WORD_IDS));
-    expect([...EASY_POOL]).toEqual(['sun', 'car', 'home', 'tree', 'flower', 'bear', 'kid', 'park']);
-    expect(BASIC_POOL.filter((id) => !EASY_POOL.includes(id))).toEqual([
-      'burger', 'shop', 'truck', 'picnic', 'dog', 'cat', 'chicken', 'duck',
-    ]);
-    expect(PUZZLE_POOL.filter((id) => !BASIC_POOL.includes(id))).toEqual([
-      'parcel', 'tooth', 'toothbrush', 'bug-coral', 'cow', 'pig', 'sheep', 'horse',
-    ]);
-    for (const extra of ['car-top', 'truck-top', 'kid-cheer', 'courier', 'bug-purple'] as const) {
-      expect(PUZZLE_POOL).not.toContain(extra);
-    }
+    expect(PUZZLE_POOL).toEqual(WORD_IDS);
   });
 
   it('draws 4/5/6 words only from that load-band pool', () => {
@@ -117,24 +113,11 @@ describe('sticker word list and deal', () => {
     const seenTray = new Set(Array.from({ length: 24 }, (_, seed) => dealBoard(seed, 8).tray.join(',')));
     expect(seenTray.size).toBeGreaterThan(1);
 
-    const laterTheme = [
-      'burger', 'shop', 'truck', 'picnic', 'parcel', 'tooth', 'toothbrush', 'bug-coral',
-      'dog', 'cat', 'chicken', 'duck', 'cow', 'pig', 'sheep', 'horse',
-    ] as const;
-    const easySeen = new Set(Array.from({ length: 48 }, (_, seed) => dealBoard(seed, 0).slots).flat());
-    expect(laterTheme.every((id) => !easySeen.has(id))).toBe(true);
-
-    const basicSeen = new Set(Array.from({ length: 80 }, (_, seed) => dealBoard(seed, 1).slots).flat());
-    expect(basicSeen.has('burger') || basicSeen.has('shop')).toBe(true);
-    expect(['dog', 'cat', 'chicken', 'duck'].some((id) => basicSeen.has(id))).toBe(true);
-    expect((['parcel', 'tooth', 'toothbrush', 'bug-coral', 'cow', 'pig', 'sheep', 'horse'] as const).every((id) => !basicSeen.has(id))).toBe(true);
-
-    const puzzleSeen = new Set(Array.from({ length: 80 }, (_, seed) => dealBoard(seed, 8).slots).flat());
-    expect(puzzleSeen.has('toothbrush')).toBe(true);
-    expect(puzzleSeen.has('bug-coral')).toBe(true);
-    expect(['cow', 'pig', 'sheep', 'horse'].some((id) => puzzleSeen.has(id))).toBe(true);
-    const laterPuzzle = new Set(Array.from({ length: 40 }, (_, seed) => dealBoard(seed, 9).slots).flat());
-    expect(laterPuzzle.has('toothbrush') || laterPuzzle.has('bug-coral')).toBe(true);
+    for (const [level, pool] of [[0, EASY_POOL], [1, BASIC_POOL], [8, PUZZLE_POOL]] as const) {
+      const seen = new Set(Array.from({ length: 80 }, (_, seed) => dealBoard(seed, level).slots).flat());
+      expect([...seen].every((id) => pool.includes(id))).toBe(true);
+      expect(seen.size).toBeGreaterThan(stickerWordCount(level));
+    }
   });
 
   it('prefers unused pool words, then recent-in-pool, and never leaves the band', () => {
@@ -144,7 +127,7 @@ describe('sticker word list and deal', () => {
     expect(next.slots.every((id) => EASY_POOL.includes(id))).toBe(true);
     expect(next.slots.some((id) => (avoid as readonly string[]).includes(id))).toBe(false);
 
-    const recentEasy = EASY_POOL.slice(0, 6);
+    const recentEasy = EASY_POOL.slice(0, -2);
     const refill = dealBoard(9, 0, recentEasy);
     expect(refill.slots).toHaveLength(4);
     expect(refill.slots.every((id) => EASY_POOL.includes(id))).toBe(true);

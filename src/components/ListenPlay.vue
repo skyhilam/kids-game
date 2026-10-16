@@ -20,6 +20,7 @@ import {
 } from '../listen/speech';
 import { WORD_ZH, type WordId } from '../sticker/words';
 import GameSprite from './GameSprite.vue';
+import SpriteStrip from './SpriteStrip.vue';
 import MazeDialog from './MazeDialog.vue';
 import ParentGuide from './ParentGuide.vue';
 import PlayChrome from './PlayChrome.vue';
@@ -33,6 +34,12 @@ const level = ref(0);
 const board = ref<ListenDeal>(dealListen(randomSeed(), 0));
 const recentTargets = ref<WordId[]>([board.value.target]);
 const correct = ref(0);
+const answeredWords = ref<WordId[]>([]);
+const fallbackArt = ['apple', 'cat', 'rocket'] as const;
+const welcomeArt = computed(() => ['kid', ...(board.value.options.length
+  ? board.value.options.slice(0, 4) : fallbackArt)] as const);
+const winArt = computed(() => ['kid', ...(answeredWords.value.length
+  ? answeredWords.value.slice(-4) : fallbackArt)] as const);
 const prompt = ref<string>(copy.guideMain);
 const shakeId = ref<WordId | null>(null);
 const flashId = ref<WordId | null>(null);
@@ -76,6 +83,7 @@ function mintDeal(nextLevel: number): void {
 function dealLevel(nextLevel: number): void {
   level.value = nextLevel;
   correct.value = 0;
+  answeredWords.value = [];
   mintDeal(nextLevel);
   prompt.value = copy.guideMain;
   overlay.value = null;
@@ -135,6 +143,7 @@ function onTap(id: WordId): void {
     return;
   }
   correct.value = result.correct;
+  if (!answeredWords.value.includes(id)) answeredWords.value.push(id);
   playCue(soundOn.value, 'collect');
   prompt.value = copy.correct;
   flashId.value = id;
@@ -324,12 +333,7 @@ onUnmounted(() => {
     <div class="dialog-inner" :class="{ 'help-inner': overlay === 'help' }">
       <template v-if="overlay === 'welcome'">
         <div class="dialog-eyebrow">{{ copy.welcomeEyebrow }}</div>
-        <svg class="dialog-hero" viewBox="0 0 420 150" aria-hidden="true">
-          <rect width="420" height="150" rx="24" fill="#e8f0f4"/>
-          <GameSprite name="kid" x="24" y="8" width="92" height="132"/>
-          <GameSprite name="sun" x="140" y="22" width="90" height="90"/>
-          <GameSprite name="car" x="248" y="34" width="140" height="96"/>
-        </svg>
+        <SpriteStrip class="dialog-hero" :names="welcomeArt" fill="#e8f0f4"/>
         <h2 id="listen-dialog-title" class="dialog-title">{{ copy.title }}</h2>
         <p class="stage-chip" :data-stage="stageLabel">第 {{ level + 1 }} 關 · {{ stageLabel }}</p>
         <p class="dialog-copy">{{ copy.welcomeBody }}</p>
@@ -387,12 +391,7 @@ onUnmounted(() => {
 
       <template v-else-if="overlay === 'win'">
         <div class="dialog-eyebrow">{{ copy.winEyebrow }}</div>
-        <svg class="dialog-hero" viewBox="0 0 420 150" aria-hidden="true">
-          <rect width="420" height="150" rx="24" fill="#e8f0f4"/>
-          <GameSprite name="kid" x="36" y="8" width="92" height="132"/>
-          <GameSprite name="sun" x="160" y="20" width="96" height="96"/>
-          <GameSprite name="flower" x="286" y="22" width="96" height="108"/>
-        </svg>
+        <SpriteStrip class="dialog-hero" :names="winArt" fill="#e8f0f4"/>
         <h2 id="listen-dialog-title" class="dialog-title">{{ copy.winTitle }}</h2>
         <p class="dialog-copy">{{ copy.winBody }}</p>
         <button class="primary-button" type="button" autofocus @click="nextLevel">

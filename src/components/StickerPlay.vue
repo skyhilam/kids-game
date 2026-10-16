@@ -21,6 +21,7 @@ import {
   type WordId,
 } from '../sticker/words';
 import GameSprite from './GameSprite.vue';
+import SpriteStrip from './SpriteStrip.vue';
 import MazeDialog from './MazeDialog.vue';
 import ParentGuide from './ParentGuide.vue';
 import PlayChrome from './PlayChrome.vue';
@@ -42,6 +43,12 @@ const stageBand = computed(() => stickerLoadBand(level.value));
 const stageLabel = computed(() => STAGE_LABEL[stageBand.value]);
 const guide = computed(() => parentCopy.sticker[stageBand.value]);
 const words = computed(() => board.value.slots);
+const fallbackArt = ['apple', 'cat', 'rocket', 'dolphin'] as const;
+const welcomeArt = computed(() => words.value.length ? words.value.slice(0, 4) : fallbackArt);
+const winArt = computed(() => {
+  const matchedWords = words.value.filter((word) => placed[word] === word);
+  return matchedWords.length ? matchedWords.slice(0, 4) : fallbackArt;
+});
 const reduceMotion = typeof window !== 'undefined'
   && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -389,13 +396,7 @@ onUnmounted(() => {
     <div class="dialog-inner" :class="{ 'help-inner': overlay === 'help' }">
       <template v-if="overlay === 'welcome'">
         <div class="dialog-eyebrow">{{ copy.welcomeEyebrow }}</div>
-        <svg class="dialog-hero" viewBox="0 0 420 150" aria-hidden="true">
-          <rect width="420" height="150" rx="24" fill="#eef4e4"/>
-          <GameSprite name="burger" x="18" y="28" width="88" height="88"/>
-          <GameSprite name="car" x="118" y="32" width="92" height="80"/>
-          <GameSprite name="tree" x="220" y="18" width="80" height="108"/>
-          <GameSprite name="sun" x="312" y="22" width="90" height="90"/>
-        </svg>
+        <SpriteStrip class="dialog-hero" :names="welcomeArt" fill="#eef4e4"/>
         <h2 id="sticker-dialog-title" class="dialog-title">{{ copy.title }}</h2>
         <p class="stage-chip" :data-stage="stageLabel">第 {{ level + 1 }} 關 · {{ stageLabel }}</p>
         <p class="dialog-copy">{{ copy.welcomeBody }}</p>
@@ -436,12 +437,7 @@ onUnmounted(() => {
 
       <template v-else-if="overlay === 'win'">
         <div class="dialog-eyebrow">{{ copy.winEyebrow }}</div>
-        <svg class="dialog-hero" viewBox="0 0 420 150" aria-hidden="true">
-          <rect width="420" height="150" rx="24" fill="#eef4e4"/>
-          <GameSprite name="flower" x="40" y="22" width="90" height="100"/>
-          <GameSprite name="sun" x="160" y="18" width="100" height="100"/>
-          <GameSprite name="home" x="280" y="24" width="96" height="100"/>
-        </svg>
+        <SpriteStrip class="dialog-hero" :names="winArt" fill="#eef4e4"/>
         <h2 id="sticker-dialog-title" class="dialog-title">{{ copy.winTitle }}</h2>
         <p class="dialog-copy">{{ copy.winBody }}</p>
         <button class="primary-button" type="button" autofocus @click="nextLevel">

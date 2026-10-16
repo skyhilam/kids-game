@@ -1,35 +1,10 @@
-import type { SpriteName } from '../art/sprites';
+import { WORD_BANK } from './wordBank';
 import { mulberry32, shuffle } from '../game/rng';
 import { stickerLoadBand, type LoadBand } from '../game/stages';
 
-export const WORD_IDS = [
-  'burger',
-  'car',
-  'home',
-  'tree',
-  'flower',
-  'sun',
-  'truck',
-  'parcel',
-  'bear',
-  'shop',
-  'park',
-  'picnic',
-  'kid',
-  'tooth',
-  'toothbrush',
-  'bug-coral',
-  'dog',
-  'cat',
-  'chicken',
-  'duck',
-  'cow',
-  'pig',
-  'sheep',
-  'horse',
-] as const satisfies readonly SpriteName[];
+export const WORD_IDS = WORD_BANK.map(({ id }) => id);
 
-export type WordId = (typeof WORD_IDS)[number];
+export type WordId = (typeof WORD_BANK)[number]['id'];
 
 export type PlacedMap = Partial<Record<WordId, WordId>>;
 
@@ -38,43 +13,16 @@ export type StickerDeal = {
   tray: WordId[];
 };
 
-/** Short everyday words for the first sticker level. */
-export const EASY_POOL: readonly WordId[] = [
-  'sun',
-  'car',
-  'home',
-  'tree',
-  'flower',
-  'bear',
-  'kid',
-  'park',
-];
+const BAND_ORDER: readonly LoadBand[] = ['easy', 'basic', 'puzzle'];
 
-/** Easy plus theme words that start appearing from basic. */
-export const BASIC_POOL: readonly WordId[] = [
-  ...EASY_POOL,
-  'burger',
-  'shop',
-  'truck',
-  'picnic',
-  'dog',
-  'cat',
-  'chicken',
-  'duck',
-];
+function poolUpTo(band: LoadBand): readonly WordId[] {
+  return WORD_BANK.filter((entry) => BAND_ORDER.indexOf(entry.band) <= BAND_ORDER.indexOf(band))
+    .map(({ id }) => id);
+}
 
-/** Full word list: basic plus longer / brushing-theme words. */
-export const PUZZLE_POOL: readonly WordId[] = [
-  ...BASIC_POOL,
-  'parcel',
-  'tooth',
-  'toothbrush',
-  'bug-coral',
-  'cow',
-  'pig',
-  'sheep',
-  'horse',
-];
+export const EASY_POOL = poolUpTo('easy');
+export const BASIC_POOL = poolUpTo('basic');
+export const PUZZLE_POOL = poolUpTo('puzzle');
 
 export const STICKER_POOL: Record<LoadBand, readonly WordId[]> = {
   easy: EASY_POOL,
@@ -100,60 +48,10 @@ export type PlaceResult =
   | { kind: 'wrong' }
   | { kind: 'blocked' };
 
-export const WORD_ZH: Record<WordId, string> = {
-  burger: '漢堡',
-  car: '小車',
-  home: '房子',
-  tree: '樹',
-  flower: '花',
-  sun: '太陽',
-  truck: '貨車',
-  parcel: '包裹',
-  bear: '小熊',
-  shop: '商店',
-  park: '公園',
-  picnic: '野餐',
-  kid: '小朋友',
-  tooth: '牙齒',
-  toothbrush: '牙刷',
-  'bug-coral': '蟲',
-  dog: '狗',
-  cat: '貓',
-  chicken: '雞',
-  duck: '鴨',
-  cow: '牛',
-  pig: '豬',
-  sheep: '羊',
-  horse: '馬',
-};
+export const WORD_ZH = Object.fromEntries(WORD_BANK.map(({ id, zh }) => [id, zh])) as Record<WordId, string>;
 
-/** English TTS / UI label. Differs from WordId when the sprite id is not the spoken word. */
-export const WORD_EN: Record<WordId, string> = {
-  burger: 'burger',
-  car: 'car',
-  home: 'home',
-  tree: 'tree',
-  flower: 'flower',
-  sun: 'sun',
-  truck: 'truck',
-  parcel: 'parcel',
-  bear: 'bear',
-  shop: 'shop',
-  park: 'park',
-  picnic: 'picnic',
-  kid: 'kid',
-  tooth: 'tooth',
-  toothbrush: 'toothbrush',
-  'bug-coral': 'bug',
-  dog: 'dog',
-  cat: 'cat',
-  chicken: 'chicken',
-  duck: 'duck',
-  cow: 'cow',
-  pig: 'pig',
-  sheep: 'sheep',
-  horse: 'horse',
-};
+/** English TTS / UI label can differ from the sprite id. */
+export const WORD_EN = Object.fromEntries(WORD_BANK.map(({ id, en }) => [id, en])) as Record<WordId, string>;
 
 export function isWordId(id: string): id is WordId {
   return (WORD_IDS as readonly string[]).includes(id);
