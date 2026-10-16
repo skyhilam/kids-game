@@ -416,10 +416,10 @@ onUnmounted(() => {
 .listen-game .brand{flex-wrap:wrap}
 .listen-game .stage-chip{align-self:center}
 .listen-lang{display:flex;padding:4px;border-radius:16px;background:#e8ecdf;gap:4px}
-.listen-lang button{min-height:40px;padding:8px 14px;background:transparent;border-radius:12px;color:#7e8a76;font-size:13px}
+.listen-lang button{min-height:44px;padding:8px 14px;background:transparent;border-radius:12px;color:#7e8a76;font-size:13px}
 .listen-lang button[aria-pressed=true]{background:#fffdf7;box-shadow:0 2px 5px #4b614110;color:#4c6d5d}
 .listen-lang-dialog{width:fit-content;margin:0 auto 16px}
-.board.listen-board{background:#e4eef2;display:flex;flex-direction:column;gap:16px;padding:42px 18px 16px;aspect-ratio:auto;height:auto;min-height:520px;overflow:visible}
+.board.listen-board{background:#e4eef2;display:flex;flex-direction:column;gap:16px;padding:42px 18px 16px;aspect-ratio:auto;height:auto;min-height:clamp(320px,50dvh,520px);overflow:visible}
 .listen-board .board-note{top:12px}
 .listen-dialog{width:min(640px,calc(100vw - 32px))}
 .listen-options{display:grid;gap:14px;flex:1;align-content:center}
@@ -437,11 +437,15 @@ onUnmounted(() => {
   .listen-option{min-height:112px;padding:8px}
   .listen-option svg{width:72px;height:66px}
   .listen-game .top-actions{flex-wrap:wrap}
-  .listen-lang button{min-height:36px;padding:6px 10px;font-size:12px}
+  .listen-lang button{min-height:44px;padding:6px 10px;font-size:12px}
 }
 @media(max-width:420px){
   .listen-option{min-height:100px;border-radius:18px}
   .listen-option svg{width:64px;height:58px}
+}
+@media(max-height:500px) and (min-width:701px){
+  .board.listen-board{min-height:0}
+  .listen-options{flex:none}
 }
 @media(prefers-reduced-motion:reduce){.listen-option.shake{animation:none}}
 </style>
