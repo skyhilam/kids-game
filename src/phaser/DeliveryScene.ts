@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import type { SpriteName } from '../art/sprites';
-import { deliveryFlowers, deliveryTrees } from '../delivery/scenery';
+import type { DecorThemeId } from '../art/decorThemes';
+import { deliveryDecor } from '../delivery/scenery';
+import { decorSprites, type Box } from '../game/decor';
 import { roadKey } from '../game/graph';
 import { EventBus } from './EventBus';
 import { syncBoardCanvas } from './display';
@@ -20,7 +22,7 @@ import {
   syncBoardSprite,
 } from './textures';
 
-const SPRITES = ['tree', 'flower', 'sun', 'home', 'parcel', 'truck-top'] as const satisfies readonly SpriteName[];
+const SPRITES = ['home', 'parcel', 'truck-top', ...decorSprites('delivery')] as const satisfies readonly SpriteName[];
 
 export class DeliveryScene extends Phaser.Scene {
   constructor() {
@@ -36,12 +38,13 @@ export class DeliveryScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#eaf0df');
     this.world = this.add.container(0, 0);
     this.scenery = this.add.graphics();
+    this.decor = this.add.container(0, 0);
     this.roads = this.add.graphics();
     this.parts = this.add.container(0, 0);
     this.truck = this.add.sprite(0, 0, atlasKey('truck-top'), 'truck-top');
     this.art = new Map();
     this.labels = new Map();
-    this.world.add([this.scenery, this.roads, this.parts, this.truck]);
+    this.world.add([this.scenery, this.decor, this.roads, this.parts, this.truck]);
     const model = this.read();
     this.fitWorld(model);
     this.syncScenery(model, true);
@@ -59,6 +62,8 @@ export class DeliveryScene extends Phaser.Scene {
 
   private world!: Phaser.GameObjects.Container;
   private scenery!: Phaser.GameObjects.Graphics;
+  private decor!: Phaser.GameObjects.Container;
+  private decorTheme!: DecorThemeId;
   private roads!: Phaser.GameObjects.Graphics;
   private parts!: Phaser.GameObjects.Container;
   private truck!: Phaser.GameObjects.Sprite;
@@ -83,20 +88,26 @@ export class DeliveryScene extends Phaser.Scene {
     if (!resized && key === this.sceneryKey) return;
     this.sceneryKey = key;
     drawDeliveryScenery(this.scenery, model.width, model.height);
-    const keep = new Set<string>(['sun']);
-    deliveryTrees(model.mission).forEach(([x, y], i) => {
-      const id = `tree-${i}`;
-      keep.add(id);
-      this.sprite(id, 'tree', x - 33, y - 48, 66, 85);
+    const { mission, houses } = model;
+    const reserved: Box[] = mission.stops.map((stop, index) => {
+      const [x, y] = mission.nodes[stop.node];
+      return { x: x - 48, y: y + houses[index]!.artY, width: 96, height: 87 };
     });
-    deliveryFlowers(model.mission).forEach(([x, y], i) => {
-      const id = `flower-${i}`;
+    // Include the label chips, whose coordinates are centred on their road nodes.
+    reserved.push(
+      { x: mission.nodes.start[0] - 50, y: mission.nodes.start[1] - 90, width: 100, height: 36 },
+      { x: mission.nodes.finish[0] - 50, y: mission.nodes.finish[1] - 68, width: 100, height: 36 },
+    );
+    const plan = deliveryDecor(mission, reserved);
+    this.decorTheme = plan.theme;
+    const keep = new Set<string>();
+    for (const item of plan.items) {
+      const id = `decor-${item.id}`;
       keep.add(id);
-      this.sprite(id, 'flower', x, y, i === 0 ? 46 : 38, i === 0 ? 40 : 35);
-    });
-    this.sprite('sun', 'sun', model.width - 76, 20, 47, 47);
+      this.sprite(id, item.name, item.x, item.y, item.width, item.height);
+    }
     for (const [id, sprite] of this.art) {
-      if ((id.startsWith('tree-') || id.startsWith('flower-')) && !keep.has(id)) sprite.setVisible(false);
+      if (id.startsWith('decor-') && !keep.has(id)) sprite.setVisible(false);
     }
   }
 
@@ -104,7 +115,7 @@ export class DeliveryScene extends Phaser.Scene {
     let sprite = this.art.get(id);
     if (!sprite) {
       sprite = addBoardSprite(this, name, x, y, width, height);
-      this.parts.add(sprite);
+      (id.startsWith('decor-') ? this.decor : this.parts).add(sprite);
       this.art.set(id, sprite);
     } else {
       sprite.setTexture(atlasKey(name), name);
@@ -215,6 +226,7 @@ export class DeliveryScene extends Phaser.Scene {
     if (!host) return;
     host.dataset.phaserReady = 'true';
     host.dataset.playerSprite = 'truck-top';
+    host.dataset.decorTheme = this.decorTheme;
     host.dataset.action = currentAction(model.mode === 'trace' && model.enabled, model.state.won);
     host.dataset.node = model.state.node;
   }
