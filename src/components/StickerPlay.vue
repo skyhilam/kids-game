@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { usePlayAudio } from '../composables/usePlayAudio';
 import { cancelSpeech, initAudio, playCue, speakEnglish } from '../game/audio';
 import { randomSeed } from '../game/rng';
@@ -98,6 +98,7 @@ function unbindDrag(): void {
 }
 
 function onDown(event: PointerEvent, id: WordId): void {
+  if (!event.isPrimary || event.button !== 0) { cancelDrag(); return; }
   if (!playing.value) return;
   event.preventDefault();
   drag.value = {
@@ -160,11 +161,22 @@ function onUp(event: PointerEvent): void {
   finishDrag(event);
 }
 
+function cancelDrag(): void {
+  drag.value = null;
+  unbindDrag();
+}
+
+function onWindowPointer(event: PointerEvent): void {
+  if (!event.isPrimary) cancelDrag();
+}
+
 function onCancel(event: PointerEvent): void {
   if (!drag.value || drag.value.pointerId !== event.pointerId) return;
   drag.value = null;
   unbindDrag();
 }
+
+watch(playing, (enabled) => { if (!enabled) cancelDrag(); }, { flush: 'sync' });
 
 function beginPlay(): void {
   overlay.value = null;
@@ -217,8 +229,15 @@ function isAway(word: WordId): boolean {
   return Boolean(slotOf(placed, word)) && drag.value?.id !== word;
 }
 
+onMounted(() => {
+  window.addEventListener('resize', cancelDrag);
+  window.addEventListener('pointerdown', onWindowPointer, true);
+});
+
 onUnmounted(() => {
-  unbindDrag();
+  cancelDrag();
+  window.removeEventListener('resize', cancelDrag);
+  window.removeEventListener('pointerdown', onWindowPointer, true);
   window.clearTimeout(shakeTimer);
   clearConfetti();
 });
@@ -445,17 +464,17 @@ onUnmounted(() => {
 .words-game .brand-logo{background:#f3ead4}
 .words-game .brand{flex-wrap:wrap}
 .words-game .stage-chip{align-self:center}
-.board.words-board{background:#e8f0dc;display:flex;flex-direction:column;gap:16px;padding:42px 18px 16px;aspect-ratio:auto;height:auto;min-height:560px;overflow:visible}
+.board.words-board{background:#e8f0dc;display:flex;flex-direction:column;gap:16px;padding:42px 18px 16px;aspect-ratio:auto;height:auto;min-height:clamp(320px,50dvh,560px);overflow:visible}
 .words-board .board-note{top:12px}
 .words-dialog{width:min(640px,calc(100vw - 32px))}
 .word-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;flex:1}
-.word-slot{min-height:0;border:2px dashed #c5d2b3;border-radius:22px;background:#f7faf0cc;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 8px;position:relative;transition:border-color .2s,background .2s,transform .2s}
+.word-slot{min-height:148px;min-width:0;border:2px dashed #c5d2b3;border-radius:22px;background:#f7faf0cc;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 8px;position:relative;transition:border-color .2s,background .2s,transform .2s}
 .word-slot.filled{border-style:solid;border-color:#b7d0a4;background:#fffdf8;justify-content:flex-end}
 .word-slot.over{border-color:#e6a557;background:#fff6df}
 .word-slot.shake{animation:words-shake .4s ease}
 .word-label{font-size:22px;letter-spacing:.6px;color:#4f6b4c;font-weight:850;display:flex;align-items:center;gap:6px}
 .word-label small{width:18px;height:18px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;display:grid;place-items:center}
-.slot-sticker,.sticker-chip{width:100%;height:auto;background:transparent;padding:0;display:grid;place-items:center;touch-action:none}
+.slot-sticker,.sticker-chip{min-height:64px;width:100%;height:auto;background:transparent;padding:0;display:grid;place-items:center;touch-action:none}
 .slot-sticker{flex:1;min-height:64px}
 .slot-sticker svg,.sticker-chip svg{width:72px;height:64px}
 .sticker-tray{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;padding:10px;border-radius:20px;background:#fffdf8d9;border:1.5px solid #e3e7d6}
@@ -475,6 +494,11 @@ onUnmounted(() => {
   .slot-sticker svg,.sticker-chip svg{width:56px;height:50px}
   .sticker-tray{grid-template-columns:repeat(3,minmax(0,1fr))}
   .tray-slot{min-height:70px}
+}
+@media(max-height:500px) and (min-width:701px){
+  .board.words-board{min-height:0}
+  .word-slots{flex:none}
+  .word-slot{min-height:148px}
 }
 @media(prefers-reduced-motion:reduce){.word-slot.shake{animation:none}}
 </style>

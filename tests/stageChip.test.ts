@@ -182,6 +182,8 @@ async function dropSticker(host: ParentNode, stickerId: string, slotId: string):
     bubbles: true,
     cancelable: true,
     pointerId: 1,
+    isPrimary: true,
+    button: 0,
     clientX: 12,
     clientY: 12,
   }));
@@ -189,6 +191,8 @@ async function dropSticker(host: ParentNode, stickerId: string, slotId: string):
     bubbles: true,
     cancelable: true,
     pointerId: 1,
+    isPrimary: true,
+    button: 0,
     clientX: 20,
     clientY: 20,
   }));

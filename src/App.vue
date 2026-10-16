@@ -8,7 +8,10 @@ import PicnicPlay from './components/PicnicPlay.vue';
 import SequencePlay from './components/SequencePlay.vue';
 import StickerPlay from './components/StickerPlay.vue';
 import ToothPlay from './components/ToothPlay.vue';
+import { useTouchGuard } from './composables/useTouchGuard';
 import { initializeLibrary } from './studio/store';
+
+useTouchGuard();
 
 const activity = ref<'hub' | 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen' | 'sequence' | 'formula'>('hub');
 const SpriteStudio = defineAsyncComponent(() => import('./studio/SpriteStudio.vue'));
