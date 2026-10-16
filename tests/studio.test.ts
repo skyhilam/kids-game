@@ -7,12 +7,13 @@ import { materials, recolorPixels } from '../src/studio/materials';
 import { WORD_IDS } from '../src/sticker/words';
 
 describe('Canvas sprite studio', () => {
-  it('covers every original sprite and the current word pool without duplicate items', () => {
+  it('covers original sprites and only model-supported words without duplicate items', () => {
     const originals = Object.entries(sprites).filter(([, sprite]) => ['picnic', 'tooth', 'delivery'].includes(sprite.atlas)).map(([name]) => name);
     expect(new Set(modelNames)).toEqual(new Set(originals));
     expect(new Set(Object.values(kits).flatMap(kit => [...kit.sprites]))).toEqual(new Set(modelNames));
     for (const kit of Object.values(kits)) for (const name of kit.sprites) expect(models).toHaveProperty(name);
     expect(kits.sticker.sprites).toEqual(WORD_IDS.filter((id) => Object.hasOwn(models, id)));
+    expect(kits.sticker.sprites.length).toBeLessThan(WORD_IDS.length);
     expect(new Set(kits.sticker.sprites).size).toBe(kits.sticker.sprites.length);
   });
   it('reproduces a seeded combination and preserves locked parts including custom colors', () => {
