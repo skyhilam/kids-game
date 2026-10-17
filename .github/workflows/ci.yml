@@ -139,3 +139,37 @@ jobs:
           SHELLCHECK_BIN="${shellcheck_dir}/shellcheck"
           "${actionlint_dir}/actionlint" -shellcheck "${SHELLCHECK_BIN}"
           git ls-files -z '*.sh' | xargs -0 -r "${SHELLCHECK_BIN}"
+
+  validate:
+    name: validate
+    if: always()
+    needs: [build, static]
+    runs-on: [self-hosted, Linux, kids-game]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Fetch job timings
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --max-time 20 \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -o "${RUNNER_TEMP}/jobs.json" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100"
+      # build and static have no job-level if. static's path gate stays inside
+      # the job and still finishes success, so ALLOWED_SKIPPED stays empty.
+      - name: Validate
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          JOBS_JSON_PATH: ${{ runner.temp }}/jobs.json
+        run: node scripts/ci-validate.mjs
