@@ -1,0 +1,4 @@
+# Self-hosted runner labels used by .github/workflows/ci.yml.
+# https://github.com/rhysd/actionlint/blob/v1.7.12/docs/config.md
+self-hosted-runner:
+  labels: [kids-game]
