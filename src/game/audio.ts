@@ -168,6 +168,16 @@ export function speakEnglish(soundOn: boolean, text: string): void {
   }
 }
 
+/** True only when sound is on and this browser exposes speech synthesis. */
+export function hasEnglishSpeech(soundOn: boolean): boolean {
+  if (!soundOn) return false;
+  try {
+    return typeof window !== 'undefined' && Boolean(window.speechSynthesis);
+  } catch {
+    return false;
+  }
+}
+
 export function cancelSpeech(): void {
   try {
     if (window.speechSynthesis) window.speechSynthesis.cancel();

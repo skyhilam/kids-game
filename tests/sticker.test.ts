@@ -8,21 +8,29 @@ import { WORD_BANK } from '../src/sticker/wordBank';
 import { STICKER_COPY } from '../src/sticker/copy';
 import {
   BASIC_POOL,
+  DEFAULT_STICKER_MODE,
   dealBoard,
   EASY_POOL,
   isCleared,
   lift,
+  nextCallout,
+  parseStickerMode,
   placedCount,
   PUZZLE_POOL,
+  recapOrder,
   rollRecent,
   slotOf,
   STICKER_POOL,
   STICKER_LOAD_COUNT,
   stickerWordCount,
   tryPlace,
+  tryPlaceCallout,
   WORD_EN,
+  WORD_HINT,
   WORD_IDS,
   WORD_ZH,
+  type PlacedMap,
+  type WordId,
 } from '../src/sticker/words';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -306,6 +314,107 @@ describe('sticker stages, copy, and hub wiring', () => {
   });
 });
 
+describe('sticker call-out and free-match logic', () => {
+  const order = ['sun', 'car', 'home', 'tree'] as const satisfies readonly WordId[];
+  const originals = [
+    'sun', 'car', 'home', 'tree', 'flower', 'bear', 'kid', 'park',
+    'burger', 'shop', 'truck', 'picnic', 'parcel', 'tooth', 'toothbrush', 'bug-coral',
+  ] as const satisfies readonly WordId[];
+
+  it('defaults to call-out and accepts only the exact free flag', () => {
+    expect(DEFAULT_STICKER_MODE).toBe('callout');
+    expect(parseStickerMode('free')).toBe('free');
+    expect(parseStickerMode(null)).toBe('callout');
+    expect(parseStickerMode(undefined)).toBe('callout');
+    expect(parseStickerMode('')).toBe('callout');
+    expect(parseStickerMode('callout')).toBe('callout');
+    expect(parseStickerMode('FREE')).toBe('callout');
+    expect(parseStickerMode('free ')).toBe('callout');
+    expect(parseStickerMode('freestyle')).toBe('callout');
+    expect(parseStickerMode('nope')).toBe('callout');
+  });
+
+  it('calls out the first slot that is not yet correctly placed', () => {
+    expect(nextCallout({}, order)).toBe('sun');
+    expect(nextCallout({ sun: 'car' }, order)).toBe('sun');
+    expect(nextCallout({ sun: 'sun' }, order)).toBe('car');
+    expect(nextCallout({ sun: 'sun', car: 'car', home: 'home' }, order)).toBe('tree');
+    expect(nextCallout({ sun: 'sun', car: 'car', home: 'home', tree: 'tree' }, order)).toBeNull();
+    expect(nextCallout({}, [])).toBeNull();
+  });
+
+  it('regression: wrong call-out drop does not lock or change placed', () => {
+    const placed: PlacedMap = { sun: 'sun', car: 'home' };
+    const before = { ...placed };
+    expect(tryPlaceCallout(placed, 'car', 'car', 'tree', order)).toEqual({ kind: 'wrong' });
+    expect(placed).toEqual(before);
+    expect(tryPlaceCallout(placed, 'car', 'car', 'sun', order)).toEqual({ kind: 'wrong' });
+    expect(placed).toEqual(before);
+    expect(nextCallout(placed, order)).toBe('car');
+  });
+
+  it('rejects a drop on any slot that is not the active call-out', () => {
+    const placed: PlacedMap = { sun: 'sun' };
+    const before = { ...placed };
+    expect(tryPlaceCallout(placed, 'car', 'home', 'car', order)).toEqual({ kind: 'inactive' });
+    expect(tryPlaceCallout(placed, 'car', 'tree', 'tree', order)).toEqual({ kind: 'inactive' });
+    expect(placed).toEqual(before);
+  });
+
+  it('locks a correct call-out and marks cleared only on the last slot', () => {
+    let placed: PlacedMap = {};
+    for (const id of order.slice(0, -1)) {
+      const step = tryPlaceCallout(placed, id, id, id, order);
+      expect(step).toMatchObject({ kind: 'correct', cleared: false });
+      if (step.kind !== 'correct') return;
+      expect(step.placed[id]).toBe(id);
+      expect(placed[id]).toBeUndefined();
+      placed = step.placed;
+      expect(nextCallout(placed, order)).not.toBe(id);
+    }
+    const last = tryPlaceCallout(placed, 'tree', 'tree', 'tree', order);
+    expect(last).toEqual({
+      kind: 'correct',
+      placed: { sun: 'sun', car: 'car', home: 'home', tree: 'tree' },
+      cleared: true,
+    });
+    if (last.kind !== 'correct') return;
+    expect(nextCallout(last.placed, order)).toBeNull();
+  });
+
+  it('reuses tryPlace when the matching sticker meets an occupied active slot', () => {
+    const placed: PlacedMap = { car: 'sun' };
+    expect(tryPlaceCallout(placed, 'car', 'car', 'car', order)).toEqual({ kind: 'blocked' });
+    expect(placed).toEqual({ car: 'sun' });
+  });
+
+  it('recaps in word-slot order without changing the deal', () => {
+    const slots: WordId[] = ['tree', 'car', 'sun', 'home'];
+    const recap = recapOrder(slots);
+    expect(recap).toEqual(['tree', 'car', 'sun', 'home']);
+    expect(recap).not.toBe(slots);
+    recap.reverse();
+    expect(slots).toEqual(['tree', 'car', 'sun', 'home']);
+    expect(recapOrder([])).toEqual([]);
+  });
+
+  it('gives every current word a non-empty phonetic mouth hint and adds no words', () => {
+    expect(Object.keys(WORD_HINT)).toEqual([...WORD_IDS]);
+    expect(WORD_IDS.length).toBeGreaterThanOrEqual(originals.length);
+    for (const id of WORD_IDS) {
+      expect(WORD_HINT[id].trim()).not.toBe('');
+      expect(WORD_HINT[id]).toMatch(/·/);
+      expect(WORD_HINT[id]).toMatch(/\p{Script=Han}/u);
+      expect(WORD_HINT[id]).not.toMatch(claims);
+    }
+    expect(WORD_HINT.car).toBe('kar · 嘴張大');
+    for (const id of originals) expect(WORD_HINT[id].trim()).not.toBe('');
+    expect(WORD_HINT['bug-coral']).toContain('bug');
+    expect(WORD_HINT.tyrannosaurus).not.toContain('tyrannosaurus');
+    expect(WORD_HINT['ice-cream']).toMatch(/ice|ais/i);
+  });
+});
+
 describe('sticker hear-then-drag', () => {
   const speech = {
     getVoices: () => [{ lang: 'en-US', name: 'Samantha' } as SpeechSynthesisVoice],
@@ -412,6 +521,37 @@ describe('sticker hear-then-drag', () => {
     expect(STICKER_COPY.controls).toContain('可以再拖');
     expect(STICKER_COPY.controls).not.toContain('放對後仍可拖出來重放');
     expect(JSON.stringify(STICKER_COPY)).not.toMatch(claims);
+  });
+
+  it('adds call-out and free-match copy without timer, score, or sticker-book claims', () => {
+    expect(STICKER_COPY.subtitle).toBe('拖貼紙配英文詞，全部放對就過關');
+    expect(STICKER_COPY.controls).toContain('可以再拖');
+    expect(STICKER_COPY.calloutIntro).toBe('聽個字，拖啱嗰張圖去發光嗰格');
+    expect(STICKER_COPY.freeIntro).toContain('撳字槽');
+    expect(STICKER_COPY.freeIntro).toContain('撳貼紙');
+    expect(STICKER_COPY.calloutWrong).toMatch(/再聽|慢慢/);
+    expect(STICKER_COPY.replayLabel).toBe('再聽一次');
+    expect(STICKER_COPY.modeCallout).toBe('聽召');
+    expect(STICKER_COPY.modeFree).toBe('自由配');
+    expect(STICKER_COPY.modeLabel).toBe('玩法');
+    expect(STICKER_COPY.recap).toBe('一齊讀一次');
+    expect(STICKER_COPY.noAudioHint).toMatch(/口型/);
+    const added = [
+      STICKER_COPY.calloutIntro,
+      STICKER_COPY.freeIntro,
+      STICKER_COPY.calloutWrong,
+      STICKER_COPY.replayLabel,
+      STICKER_COPY.modeCallout,
+      STICKER_COPY.modeFree,
+      STICKER_COPY.modeLabel,
+      STICKER_COPY.recap,
+      STICKER_COPY.noAudioHint,
+    ];
+    for (const line of added) {
+      expect(line.trim()).not.toBe('');
+      expect(line).not.toMatch(claims);
+      expect(line).not.toMatch(/計時|扣分/);
+    }
   });
 
   it('wires tap-to-hear before drag, locks a correct sticker, and hints a wrong drop without failing', () => {

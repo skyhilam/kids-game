@@ -53,6 +53,58 @@ export const WORD_ZH = Object.fromEntries(WORD_BANK.map(({ id, zh }) => [id, zh]
 /** English TTS / UI label can differ from the sprite id. */
 export const WORD_EN = Object.fromEntries(WORD_BANK.map(({ id, en }) => [id, en])) as Record<WordId, string>;
 
+/** Spoken hint when English TTS is unavailable: approximate sound · mouth shape. */
+export const WORD_HINT: Record<WordId, string> = {
+  sun: 'san · 嘴微張',
+  car: 'kar · 嘴張大',
+  home: 'hom · 嘴圓',
+  tree: 'tree · 舌尖輕出',
+  flower: 'flau-er · 嘴先圓後開',
+  bear: 'bair · 雙唇輕開',
+  kid: 'kid · 嘴微開',
+  park: 'park · 嘴張大',
+  apple: 'a-pl · 嘴先大後合',
+  banana: 'be-na-na · 嘴微張',
+  cat: 'kat · 嘴微開',
+  dog: 'dog · 嘴圓',
+  duck: 'duk · 嘴圓',
+  fish: 'fish · 門牙輕咬下唇',
+  cake: 'keik · 嘴向兩邊',
+  star: 'star · 嘴微張',
+  burger: 'ber-ger · 嘴圓再開',
+  shop: 'shop · 嘴圓',
+  truck: 'truk · 嘴圓',
+  picnic: 'pik-nik · 嘴先閉後開',
+  cow: 'kau · 嘴圓',
+  pig: 'pig · 嘴微開',
+  sheep: 'sheep · 嘴向兩邊',
+  rabbit: 'ra-bit · 嘴微張',
+  bee: 'bee · 嘴向兩邊',
+  butterfly: 'ba-ter-flai · 嘴先合後開',
+  pizza: 'pit-sa · 嘴先閉後開',
+  milk: 'milk · 雙唇合住',
+  train: 'trein · 嘴向兩邊',
+  rocket: 'ro-kit · 嘴圓再開',
+  drum: 'drum · 嘴圓',
+  guitar: 'gi-tar · 嘴先開後張',
+  chicken: 'chi-ken · 嘴微張',
+  horse: 'hors · 嘴圓',
+  parcel: 'par-sel · 嘴張大',
+  tooth: 'tooth · 舌尖輕出',
+  toothbrush: 'tooth-brush · 嘴先開後圓',
+  'bug-coral': 'bug · 嘴圓',
+  dolphin: 'dol-fin · 嘴圓再開',
+  octopus: 'ok-te-pus · 嘴先圓後合',
+  crab: 'krab · 嘴微開',
+  penguin: 'pen-gwin · 嘴先閉後圓',
+  ladybug: 'lei-di-bug · 嘴向兩邊',
+  sunflower: 'san-flau-er · 嘴先微張後圓',
+  excavator: 'eks-ke-vei-ter · 嘴先開後圓',
+  'ice-cream': 'ais kreem · 嘴向兩邊',
+  tyrannosaurus: 'dai-ne-sor · 嘴微張',
+  library: 'lai-brer-i · 嘴微開',
+};
+
 export function isWordId(id: string): id is WordId {
   return (WORD_IDS as readonly string[]).includes(id);
 }
@@ -117,4 +169,42 @@ export function tryPlace(
   const next = lift(placed, sticker);
   next[slot] = sticker;
   return { kind: 'correct', placed: next, cleared: isCleared(next, words) };
+}
+
+export type StickerMode = 'callout' | 'free';
+
+export const DEFAULT_STICKER_MODE: StickerMode = 'callout';
+
+/** Only the exact flag `free` leaves call-out. Everything else stays on the default. */
+export function parseStickerMode(value: string | null | undefined): StickerMode {
+  return value === 'free' ? 'free' : 'callout';
+}
+
+/** First slot in board order that does not yet hold its own sticker. */
+export function nextCallout(placed: PlacedMap, order: readonly WordId[]): WordId | null {
+  return order.find((id) => placed[id] !== id) ?? null;
+}
+
+export type CalloutPlaceResult = { kind: 'inactive' } | PlaceResult;
+
+/**
+ * Call-out accepts a drop only on the active slot.
+ * A different sticker returns `wrong` and does not lock, even if the slot is occupied.
+ * The matching sticker reuses `tryPlace`, including its `cleared` check.
+ */
+export function tryPlaceCallout(
+  placed: PlacedMap,
+  active: WordId,
+  slot: WordId,
+  sticker: WordId,
+  words: readonly WordId[],
+): CalloutPlaceResult {
+  if (slot !== active) return { kind: 'inactive' };
+  if (sticker !== active) return { kind: 'wrong' };
+  return tryPlace(placed, slot, sticker, words);
+}
+
+/** Recap follows the word-slot order of this deal. */
+export function recapOrder(words: readonly WordId[]): WordId[] {
+  return words.slice();
 }
