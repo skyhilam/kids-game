@@ -416,6 +416,217 @@ async function runRotationRegression(page) {
   } finally { page.off('pageerror', onError); }
 }
 
+function phonicsClearedThroughZone7() {
+  const totals = { 1: 10, 2: 8, 3: 10, 4: 8, 5: 10, 6: 10, 7: 8 };
+  const zones = {};
+  for (let id = 1; id <= 8; id += 1) {
+    const total = totals[id];
+    zones[String(id)] = total
+      ? { cleared: true, bestStars: 3, attempts: total, correct: total, rounds: 1, wrongBook: [] }
+      : { cleared: false, bestStars: 0, attempts: 0, correct: 0, rounds: 0, wrongBook: [] };
+  }
+  return JSON.stringify({ version: 1, zones });
+}
+
+async function phonicsZoneRows(page) {
+  await page.locator('[data-phonics-zone]').nth(7).waitFor();
+  return page.locator('[data-phonics-zone]').evaluateAll((nodes) => nodes.map((node) => ({
+    id: node.getAttribute('data-phonics-zone'),
+    locked: node.getAttribute('data-locked'),
+  })));
+}
+
+function assertPhonicsLocks(zones, unlockedIds) {
+  const ids = zones.map((zone) => zone.id).join(',');
+  if (zones.length !== 8 || ids !== '1,2,3,4,5,6,7,8') {
+    throw new Error(`expected 8 phonics zones, got ${ids || zones.length}`);
+  }
+  const open = new Set(unlockedIds);
+  for (const zone of zones) {
+    const expectLocked = open.has(zone.id) ? 'false' : 'true';
+    if (zone.locked !== expectLocked) {
+      throw new Error(`Z${zone.id} lock was ${zone.locked}, expected ${expectLocked}`);
+    }
+  }
+}
+
+async function openPhonics(page) {
+  await page.getByRole('button', { name: '語音島' }).click();
+  await page.locator('[data-phonics-screen="map"]').waitFor();
+  await page.locator('[data-phonics-zone="8"]').waitFor();
+}
+
+async function phonicsQuestionTotal(page) {
+  const text = (await page.locator('[data-phonics-progress]').innerText()).replace(/\s+/g, ' ').trim();
+  const match = text.match(/^(\d+) \/ (\d+)$/);
+  if (!match) throw new Error(`bad phonics progress: ${text}`);
+  return Number(match[2]);
+}
+
+async function answerPhonicsQuestion(page, correct) {
+  const round = page.locator('.phonics-round');
+  await round.waitFor();
+  const before = (await page.locator('[data-phonics-progress]').innerText()).replace(/\s+/g, ' ').trim();
+  const accepted = ((await round.getAttribute('data-phonics-answer')) ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!accepted.length) throw new Error(`missing data-phonics-answer at ${before}`);
+  const options = round.locator('[data-phonics-option]');
+  const count = await options.count();
+  let choice = null;
+  for (let i = 0; i < count; i += 1) {
+    const id = await options.nth(i).getAttribute('data-phonics-option');
+    const hit = accepted.includes(id ?? '');
+    if (correct ? id === accepted[0] : !hit) {
+      choice = options.nth(i);
+      break;
+    }
+  }
+  if (!choice) {
+    throw new Error(`no ${correct ? 'correct' : 'wrong'} phonics option at ${before}: ${accepted.join('|')}`);
+  }
+  await choice.click();
+  await page.waitForFunction((prev) => {
+    const dialog = document.querySelector('#phonicsResult');
+    if (dialog instanceof HTMLDialogElement && dialog.open) return true;
+    const progress = document.querySelector('[data-phonics-progress]');
+    const text = progress?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+    return text !== '' && text !== prev;
+  }, before);
+}
+
+async function startPhonicsZone(page, zoneId) {
+  await page.locator(`[data-phonics-zone="${zoneId}"]`).scrollIntoViewIfNeeded();
+  await page.locator(`[data-phonics-zone="${zoneId}"]`).click();
+  await page.locator(`[data-phonics-tutorial="${zoneId}"]`).waitFor();
+  await page.locator('[data-phonics-start]').click();
+  await page.locator(`[data-phonics-active-zone="${zoneId}"]`).waitFor();
+  return phonicsQuestionTotal(page);
+}
+
+async function finishPhonicsRound(page, zoneId, correct) {
+  const total = await startPhonicsZone(page, zoneId);
+  for (let i = 0; i < total; i += 1) await answerPhonicsQuestion(page, correct);
+  const dialog = page.locator('#phonicsResult');
+  await page.waitForFunction(() => {
+    const node = document.querySelector('#phonicsResult');
+    return node instanceof HTMLDialogElement && node.open;
+  });
+  return {
+    total,
+    passed: await dialog.getAttribute('data-passed'),
+    stars: await dialog.getAttribute('data-stars'),
+  };
+}
+
+async function backToPhonicsMap(page) {
+  await page.locator('#phonicsResult').getByRole('button', { name: '返回地圖' }).click();
+  await page.locator('[data-phonics-screen="map"]').waitFor();
+  await page.waitForFunction(() => {
+    const node = document.querySelector('#phonicsResult');
+    return !(node instanceof HTMLDialogElement && node.open);
+  });
+}
+
+async function assertPhonicsScrollWidth(page, where) {
+  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  if (scrollWidth > 390) throw new Error(`phonics ${where} scrollWidth ${scrollWidth}`);
+}
+
+// Phonics Island rest stop. Picnic, tooth, and delivery steps above stay unchanged.
+async function runPhonics(page) {
+  const errors = [];
+  const onError = (err) => errors.push(String(err));
+  page.on('pageerror', onError);
+  try {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await openHub(page);
+    await page.evaluate(() => localStorage.removeItem('kids-phonics-island-v1'));
+    await openPhonics(page);
+    assertPhonicsLocks(await phonicsZoneRows(page), ['1']);
+    await page.screenshot({ path: join(outDir, 'phonics-map.png'), fullPage: true });
+
+    const zone1 = await finishPhonicsRound(page, 1, true);
+    if (zone1.total !== 10 || zone1.passed !== 'true' || zone1.stars !== '3') {
+      throw new Error(`Z1 result was ${JSON.stringify(zone1)}`);
+    }
+    await backToPhonicsMap(page);
+    assertPhonicsLocks(await phonicsZoneRows(page), ['1', '2']);
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.getByRole('heading', { name: '選擇遊戲' }).waitFor();
+    await openPhonics(page);
+    assertPhonicsLocks(await phonicsZoneRows(page), ['1', '2']);
+
+    const zone2Total = await startPhonicsZone(page, 2);
+    if (zone2Total !== 8) throw new Error(`Z2 should ask 8, got ${zone2Total}`);
+    await answerPhonicsQuestion(page, true);
+    await answerPhonicsQuestion(page, true);
+    await goHome(page);
+    if (errors.length) throw new Error(`phonics page errors after leaving Z2: ${errors.join(' | ')}`);
+
+    await openPhonics(page);
+    await page.getByRole('button', { name: '家長摘要' }).click();
+    const zone1Summary = page.locator('[data-phonics-summary-zone="1"] td').first();
+    await zone1Summary.waitFor();
+    const zone1Accuracy = (await zone1Summary.innerText()).trim();
+    if (zone1Accuracy !== '100%') throw new Error(`parent summary Z1 was ${zone1Accuracy}`);
+
+    await page.evaluate((raw) => {
+      localStorage.setItem('kids-phonics-island-v1', raw);
+    }, phonicsClearedThroughZone7());
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.getByRole('heading', { name: '選擇遊戲' }).waitFor();
+    await openPhonics(page);
+    assertPhonicsLocks(await phonicsZoneRows(page), ['1', '2', '3', '4', '5', '6', '7', '8']);
+
+    for (const zoneId of [6, 8]) {
+      const round = await finishPhonicsRound(page, zoneId, true);
+      if (round.total !== 10 || round.passed !== 'true' || round.stars !== '3') {
+        throw new Error(`Z${zoneId} result was ${JSON.stringify(round)}`);
+      }
+      await backToPhonicsMap(page);
+    }
+
+    const z3Before = (await phonicsZoneRows(page)).find((zone) => zone.id === '3')?.locked;
+    if (z3Before !== 'false') throw new Error(`Z3 should already be unlocked, got ${z3Before}`);
+    const failed = await finishPhonicsRound(page, 2, false);
+    if (failed.total !== 8 || failed.passed !== 'false') {
+      throw new Error(`Z2 fail result was ${JSON.stringify(failed)}`);
+    }
+    await backToPhonicsMap(page);
+    const z3After = (await phonicsZoneRows(page)).find((zone) => zone.id === '3')?.locked;
+    if (z3After !== z3Before) throw new Error(`Z3 lock changed from ${z3Before} to ${z3After}`);
+
+    await goHome(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openPhonics(page);
+    await assertPhonicsScrollWidth(page, 'map');
+    const mobileTotal = await startPhonicsZone(page, 1);
+    if (mobileTotal !== 10) throw new Error(`mobile Z1 should ask 10, got ${mobileTotal}`);
+    const options = page.locator('[data-phonics-option]');
+    const optionCount = await options.count();
+    if (optionCount < 1) throw new Error('no phonics options on mobile Z1');
+    for (let i = 0; i < optionCount; i += 1) {
+      await options.nth(i).scrollIntoViewIfNeeded();
+      const box = await options.nth(i).boundingBox();
+      if (!box || box.height < 48) {
+        throw new Error(`phonics option height ${box ? box.height : 'missing'}`);
+      }
+    }
+    await assertPhonicsScrollWidth(page, 'Z1');
+    await page.screenshot({ path: join(outDir, 'phonics-mobile.png'), fullPage: true });
+    await goHome(page);
+
+    if (errors.length) throw new Error(`phonics page errors: ${errors.join(' | ')}`);
+    log('phonics: 8 zones, Z1 3 stars, Z2 persists, Z1 100%, Z6 and Z8 cleared, Z2 fail keeps Z3, mobile ok');
+  } finally {
+    page.off('pageerror', onError);
+    await page.setViewportSize({ width: 1024, height: 768 });
+  }
+}
+
 const preview = spawn(process.execPath, [join(root, 'node_modules/vite/bin/vite.js'), 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
   cwd: root,
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -457,6 +668,7 @@ try {
   log('desktop tooth: first map then 第 2 關 playable');
   await goHome(page);
   await runFormulaRestStop(page);
+  await runPhonics(page);
   await runRotationRegression(page);
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
