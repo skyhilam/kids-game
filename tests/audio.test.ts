@@ -266,6 +266,28 @@ describe('mute gates synthesis and speech', () => {
     expect(yue.voice?.lang).toMatch(/zh-HK|yue/i);
   });
 
+  it('detects english speech only when sound is on and speechSynthesis exists', async () => {
+    const { hasEnglishSpeech } = await import('../src/game/audio');
+    expect(hasEnglishSpeech(false)).toBe(false);
+    expect(hasEnglishSpeech(true)).toBe(true);
+
+    vi.resetModules();
+    vi.stubGlobal('window', {});
+    const missing = await import('../src/game/audio');
+    expect(missing.hasEnglishSpeech(false)).toBe(false);
+    expect(missing.hasEnglishSpeech(true)).toBe(false);
+
+    vi.resetModules();
+    vi.stubGlobal('window', {
+      get speechSynthesis() {
+        throw new Error('speech blocked');
+      },
+    });
+    const blocked = await import('../src/game/audio');
+    expect(() => blocked.hasEnglishSpeech(true)).not.toThrow();
+    expect(blocked.hasEnglishSpeech(true)).toBe(false);
+  });
+
   it('keeps listen muted in both languages and skips Mandarin fallback', async () => {
     speech.getVoices = () => [
       { lang: 'zh-CN', name: 'Tingting' } as SpeechSynthesisVoice,

@@ -36,4 +36,13 @@ export const STICKER_COPY = {
   trayLabel: '貼紙托盤',
   slotsLabel: '英文詞格子',
   footer: ['從容遊玩', '不計時 · 不扣分', '圖詞配對'] as const,
+  calloutIntro: '聽個字，拖啱嗰張圖去發光嗰格',
+  freeIntro: '全部字格都開。撳字槽或者撳貼紙都會讀出個字，再拖圖去對嘅字。',
+  calloutWrong: '未貼中呀，再聽清楚個字，慢慢再試。',
+  replayLabel: '再聽一次',
+  modeCallout: '聽召',
+  modeFree: '自由配',
+  modeLabel: '玩法',
+  recap: '一齊讀一次',
+  noAudioHint: '而家讀唔到聲。睇大字同口型提示，呢關一樣可以完成。',
 } as const;
