@@ -6,6 +6,12 @@ import { randomSeed } from '../game/rng';
 import { formatStageChip, parentCopy, STAGE_LABEL, stickerLoadBand } from '../game/stages';
 import { STICKER_COPY as copy } from '../sticker/copy';
 import {
+  markStickerOnboardSeen,
+  readStickerOnboardSeen,
+  speakStickerWord,
+  wrongDropFeedback,
+} from '../sticker/hear';
+import {
   dealBoard,
   isWordId,
   lift,
@@ -35,9 +41,12 @@ const board = ref<StickerDeal>(dealBoard(randomSeed(), 0));
 const recentDeals = ref<WordId[][]>([board.value.slots]);
 const placed = reactive<PlacedMap>({});
 const shakeSlot = ref<WordId | null>(null);
+const hintSlot = ref<WordId | null>(null);
+const showOnboard = ref(false);
 const message = ref<string>(copy.guideMain);
 const confettiBits = ref<{ i: number; left: string; bg: string; delay: string; duration: string; round: boolean; drift: string }[]>([]);
 let shakeTimer = 0;
+let hintTimer = 0;
 let confettiTimer = 0;
 const stageBand = computed(() => stickerLoadBand(level.value));
 const stageLabel = computed(() => STAGE_LABEL[stageBand.value]);
@@ -88,6 +97,8 @@ function dealLevel(nextLevel: number): void {
   resetPlaced();
   message.value = copy.guideMain;
   overlay.value = null;
+  window.clearTimeout(hintTimer);
+  hintSlot.value = null;
   clearConfetti();
   cancelSpeech();
 }
@@ -104,9 +115,17 @@ function unbindDrag(): void {
   window.removeEventListener('pointercancel', onCancel);
 }
 
+function hearSticker(id: WordId): void {
+  if (!playing.value) return;
+  initAudio(soundOn.value);
+  speakStickerWord(soundOn.value, id);
+}
+
 function onDown(event: PointerEvent, id: WordId): void {
   if (!event.isPrimary || event.button !== 0) { cancelDrag(); return; }
   if (!playing.value) return;
+  initAudio(soundOn.value);
+  speakStickerWord(soundOn.value, id);
   event.preventDefault();
   drag.value = {
     id,
@@ -144,6 +163,7 @@ function finishDrag(event: PointerEvent): void {
     playCue(soundOn.value, 'collect');
     speakEnglish(soundOn.value, WORD_EN[id]);
     message.value = `對喇，${WORD_EN[id]}`;
+    hideOnboard();
     if (result.cleared) {
       overlay.value = 'win';
       playCue(soundOn.value, 'win');
@@ -155,13 +175,13 @@ function finishDrag(event: PointerEvent): void {
   window.clearTimeout(shakeTimer);
   shakeSlot.value = slot;
   shakeTimer = window.setTimeout(() => { shakeSlot.value = null; }, 420);
-  if (result.kind === 'blocked') {
-    toast(copy.blocked);
-    message.value = copy.blocked;
-    return;
-  }
-  toast(copy.wrong);
-  message.value = copy.wrong;
+  const feedback = wrongDropFeedback(id);
+  window.clearTimeout(hintTimer);
+  hintSlot.value = feedback.hintSlot;
+  hintTimer = window.setTimeout(() => { hintSlot.value = null; }, 1600);
+  message.value = feedback.message;
+  toast(feedback.message);
+  speakStickerWord(soundOn.value, feedback.speakId);
 }
 
 function onUp(event: PointerEvent): void {
@@ -185,10 +205,16 @@ function onCancel(event: PointerEvent): void {
 
 watch(playing, (enabled) => { if (!enabled) cancelDrag(); }, { flush: 'sync' });
 
+function hideOnboard(): void {
+  markStickerOnboardSeen();
+  showOnboard.value = false;
+}
+
 function beginPlay(): void {
   overlay.value = null;
   initAudio(soundOn.value);
   playCue(soundOn.value, 'welcome');
+  showOnboard.value = !readStickerOnboardSeen();
 }
 
 function closeHelp(): void {
@@ -246,6 +272,8 @@ onUnmounted(() => {
   window.removeEventListener('resize', cancelDrag);
   window.removeEventListener('pointerdown', onWindowPointer, true);
   window.clearTimeout(shakeTimer);
+  window.clearTimeout(hintTimer);
+  hintSlot.value = null;
   clearConfetti();
 });
 </script>
@@ -303,6 +331,10 @@ onUnmounted(() => {
     <div class="board-frame">
       <div class="board words-board" :class="{ dragging: Boolean(drag) }">
         <p class="board-note">把貼紙拖到英文詞上</p>
+        <div v-if="showOnboard" class="sticker-onboard" data-sticker-onboard>
+          <span>{{ copy.onboard }}</span>
+          <button type="button" @click="hideOnboard">{{ copy.onboardSkip }}</button>
+        </div>
         <div
           class="word-slots"
           role="list"
@@ -317,21 +349,20 @@ onUnmounted(() => {
               filled: placed[word] && drag?.id !== placed[word],
               over: drag?.over === word,
               shake: shakeSlot === word,
+              hint: hintSlot === word,
             }"
             :data-word-slot="word"
             role="listitem"
             :aria-label="`英文詞 ${WORD_EN[word]}`"
           >
-            <button
+            <div
               v-if="placed[word] && drag?.id !== placed[word]"
-              type="button"
               class="slot-sticker"
               :data-sticker="placed[word]"
               :data-placed="word"
-              @pointerdown="onDown($event, placed[word]!)"
             >
               <GameSprite :name="placed[word]!" :label="WORD_ZH[placed[word]!]" />
-            </button>
+            </div>
             <span class="word-label">
               {{ WORD_EN[word] }}
               <small v-if="placed[word] && drag?.id !== placed[word]" aria-hidden="true">✓</small>
@@ -354,9 +385,13 @@ onUnmounted(() => {
               type="button"
               class="sticker-chip"
               :data-sticker="word"
+              :aria-label="`撳聽 ${WORD_ZH[word]}`"
               @pointerdown="onDown($event, word)"
+              @keydown.enter.prevent="hearSticker(word)"
+              @keydown.space.prevent="hearSticker(word)"
             >
               <GameSprite :name="word" :label="WORD_ZH[word]" />
+              <svg class="chip-speaker" aria-hidden="true"><use href="#i-sound"/></svg>
             </button>
           </div>
         </div>
@@ -468,15 +503,20 @@ onUnmounted(() => {
 .word-slot.filled{border-style:solid;border-color:#b7d0a4;background:#fffdf8;justify-content:flex-end}
 .word-slot.over{border-color:#e6a557;background:#fff6df}
 .word-slot.shake{animation:words-shake .4s ease}
+.word-slot.hint{border-color:#e6a557;box-shadow:0 0 0 4px #e6a55740}
 .word-label{font-size:22px;letter-spacing:.6px;color:#4f6b4c;font-weight:850;display:flex;align-items:center;gap:6px}
 .word-label small{width:18px;height:18px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;display:grid;place-items:center}
 .slot-sticker,.sticker-chip{min-height:64px;width:100%;height:auto;background:transparent;padding:0;display:grid;place-items:center;touch-action:none}
-.slot-sticker{flex:1;min-height:64px}
+.slot-sticker{flex:1;min-height:64px;pointer-events:none}
 .slot-sticker svg,.sticker-chip svg{width:72px;height:64px}
+.sticker-chip{position:relative}
+.sticker-chip svg.chip-speaker{position:absolute;right:2px;bottom:2px;width:18px;height:18px;pointer-events:none;opacity:.75}
 .sticker-tray{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;padding:10px;border-radius:20px;background:#fffdf8d9;border:1.5px solid #e3e7d6}
 .tray-slot{min-height:78px;border-radius:16px;background:#f3f5ea;display:grid;place-items:center}
 .tray-slot.empty{background:#eef1e4;border:1.5px dashed #d3d8c6}
 .sticker-float{position:fixed;z-index:50;width:88px;height:80px;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 8px 12px #304b4330)}
+.sticker-onboard{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;margin:0;padding:6px 8px 6px 12px;border-radius:16px;background:#fffdf8f2;border:1.5px solid #d7e2c4;color:#3f5c3e;font-size:14px;font-weight:800;line-height:1.3;pointer-events:none}
+.sticker-onboard button{pointer-events:auto;border-radius:999px;background:#e8f0dc;padding:4px 10px;font-size:13px;font-weight:800}
 .words-help-cols{margin:8px 0 4px}
 .words-dialog .stage-chip{margin:0 auto 10px}
 @keyframes words-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
@@ -496,5 +536,5 @@ onUnmounted(() => {
   .word-slots{flex:none}
   .word-slot{min-height:148px}
 }
-@media(prefers-reduced-motion:reduce){.word-slot.shake{animation:none}}
+@media(prefers-reduced-motion:reduce){.word-slot.shake,.word-slot.hint{animation:none}}
 </style>

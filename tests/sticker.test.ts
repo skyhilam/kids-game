@@ -413,4 +413,39 @@ describe('sticker hear-then-drag', () => {
     expect(STICKER_COPY.controls).not.toContain('放對後仍可拖出來重放');
     expect(JSON.stringify(STICKER_COPY)).not.toMatch(claims);
   });
+
+  it('wires tap-to-hear before drag, locks a correct sticker, and hints a wrong drop without failing', () => {
+    const play = readFileSync(join(root, 'src/components/StickerPlay.vue'), 'utf8');
+    expect(play).toContain('speakStickerWord');
+    expect(play).toContain('wrongDropFeedback');
+    expect(play).toContain('readStickerOnboardSeen');
+    expect(play).toContain('markStickerOnboardSeen');
+    expect(play).toContain('copy.onboard');
+    expect(play).toContain('data-sticker-onboard');
+
+    const onDown = play.slice(play.indexOf('function onDown'), play.indexOf('function onMove'));
+    const speakAt = onDown.indexOf('speakStickerWord');
+    const dragListenAt = onDown.indexOf("window.addEventListener('pointermove'");
+    expect(speakAt).toBeGreaterThan(-1);
+    expect(dragListenAt).toBeGreaterThan(speakAt);
+    expect(onDown.slice(speakAt, dragListenAt)).not.toContain('return');
+    expect(onDown.indexOf('if (!playing.value) return;')).toBeLessThan(onDown.indexOf('initAudio(soundOn.value)'));
+    expect(onDown.indexOf('initAudio(soundOn.value)')).toBeLessThan(speakAt);
+    expect(onDown).not.toMatch(/heard|listenedBefore|mustListen|先聽過/);
+
+    const slotSection = play.slice(play.indexOf('class="slot-sticker"'), play.indexOf('class="word-label"'));
+    expect(slotSection).not.toContain('@pointerdown');
+    expect(play).toContain('@keydown.enter');
+    expect(play).toContain('@keydown.space');
+    expect(play).toContain('撳聽');
+    expect(play).toContain('feedback.message');
+    expect(play).toContain('hint: hintSlot === word');
+    expect(play).toContain('1600');
+    expect(play).not.toMatch(/overlay\.value\s*=\s*['"]fail['"]/);
+
+    const dealLevel = play.slice(play.indexOf('function dealLevel'), play.indexOf('function slotAtPoint'));
+    const unmounted = play.slice(play.indexOf('onUnmounted'), play.indexOf('</script>'));
+    expect(dealLevel).toContain('clearTimeout(hintTimer)');
+    expect(unmounted).toContain('clearTimeout(hintTimer)');
+  });
 });
