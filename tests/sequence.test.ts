@@ -435,7 +435,7 @@ describe('sequence copy, parent guide, and hub card', () => {
     expect(hub).toContain('name="home"');
     expect(hub).toContain('name="burger"');
     expect(hub).toContain('name="park"');
-    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(7);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(8);
     expect([...hub.matchAll(/class="hub-stages"/g)]).toHaveLength(3);
     expect(hub).toContain('聽一聽揀圖');
     expect(hub).toContain('貼紙學單字');
