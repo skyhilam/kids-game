@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sprites } from '../src/art/sprites';
 import { mazeLoadBand, parentCopy, stickerLoadBand, STAGE_LABEL } from '../src/game/stages';
 import { WORD_BANK } from '../src/sticker/wordBank';
@@ -303,5 +303,149 @@ describe('sticker stages, copy, and hub wiring', () => {
     expect(tooth).toContain('打敗蛀牙蟲');
     expect(delivery).toContain('送貨員來了');
     expect(picnic + tooth + delivery).not.toMatch(/sticker\/words|貼紙學單字/);
+  });
+});
+
+describe('sticker hear-then-drag', () => {
+  const speech = {
+    getVoices: () => [{ lang: 'en-US', name: 'Samantha' } as SpeechSynthesisVoice],
+    cancel: vi.fn(),
+    speak: vi.fn(),
+    addEventListener: vi.fn(),
+  };
+
+  function mapStorage(map: Map<string, string>, fail = false): Storage {
+    const blocked = () => {
+      throw new Error('storage blocked');
+    };
+    return {
+      get length() { return map.size; },
+      clear() { if (fail) blocked(); map.clear(); },
+      getItem(key: string) {
+        if (fail) blocked();
+        return map.get(key) ?? null;
+      },
+      key(index: number) {
+        if (fail) blocked();
+        return [...map.keys()][index] ?? null;
+      },
+      removeItem(key: string) {
+        if (fail) blocked();
+        map.delete(key);
+      },
+      setItem(key: string, value: string) {
+        if (fail) blocked();
+        map.set(key, value);
+      },
+    };
+  }
+
+  beforeEach(() => {
+    speech.cancel.mockReset();
+    speech.speak.mockReset();
+    speech.getVoices = () => [{ lang: 'en-US', name: 'Samantha' } as SpeechSynthesisVoice];
+    vi.resetModules();
+    vi.stubGlobal('speechSynthesis', speech);
+    vi.stubGlobal('SpeechSynthesisUtterance', class {
+      voice: SpeechSynthesisVoice | null = null;
+      lang = '';
+      rate = 1;
+      pitch = 1;
+      volume = 1;
+      constructor(public text: string) {}
+    });
+    vi.stubGlobal('window', { speechSynthesis: speech });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('speaks the English word on tap, repeats, and stays quiet when muted', async () => {
+    const source = readFileSync(join(root, 'src/sticker/hear.ts'), 'utf8');
+    expect(source).toContain('speakEnglish(soundOn, WORD_EN[id])');
+    expect(source).not.toMatch(/speakEnglish\(\s*soundOn\s*,\s*id\s*\)/);
+    expect(source).not.toMatch(/from ['"]vue['"]/);
+
+    const { speakStickerWord } = await import('../src/sticker/hear');
+    speakStickerWord(true, 'bug-coral');
+    speakStickerWord(true, 'bug-coral');
+    expect(speech.speak).toHaveBeenCalledTimes(2);
+    const texts = speech.speak.mock.calls.map((call) => (call[0] as SpeechSynthesisUtterance).text);
+    expect(texts).toEqual(['bug', 'bug']);
+
+    speech.speak.mockClear();
+    speakStickerWord(false, 'bug-coral');
+    expect(speech.speak).not.toHaveBeenCalled();
+  });
+
+  it('hints the sticker’s own slot and names its English word after a wrong drop', async () => {
+    const { wrongDropFeedback } = await import('../src/sticker/hear');
+    const feedback = wrongDropFeedback('car');
+    expect(feedback.hintSlot).toBe('car');
+    expect(feedback.speakId).toBe('car');
+    expect(feedback.message).toContain('car');
+    expect(wrongDropFeedback('bug-coral').message).toContain('bug');
+  });
+
+  it('shows onboarding once and treats a throwing store as unseen', async () => {
+    const { STICKER_ONBOARD_KEY, markStickerOnboardSeen, readStickerOnboardSeen } = await import('../src/sticker/hear');
+    const map = new Map<string, string>();
+    const store = mapStorage(map);
+    expect(readStickerOnboardSeen(store)).toBe(false);
+    markStickerOnboardSeen(store);
+    expect(readStickerOnboardSeen(store)).toBe(true);
+    expect(map.get(STICKER_ONBOARD_KEY)).toBe('1');
+
+    const throwing = mapStorage(new Map(), true);
+    expect(() => readStickerOnboardSeen(throwing)).not.toThrow();
+    expect(readStickerOnboardSeen(throwing)).toBe(false);
+    expect(() => markStickerOnboardSeen(throwing)).not.toThrow();
+  });
+
+  it('keeps the first-time onboard line and tap-to-hear copy', () => {
+    expect(STICKER_COPY.onboard).toBe('先撳貼紙聽，再拉過去');
+    expect(STICKER_COPY.onboardSkip).toBe('知道了');
+    expect(STICKER_COPY.tapHint).toBe('撳貼紙可以聽英文');
+    expect(STICKER_COPY.guideSub).toContain('撳貼紙可以聽');
+    expect(STICKER_COPY.controls).toContain('撳貼紙可以聽英文');
+    expect(STICKER_COPY.controls).toContain('可以再拖');
+    expect(STICKER_COPY.controls).not.toContain('放對後仍可拖出來重放');
+    expect(JSON.stringify(STICKER_COPY)).not.toMatch(claims);
+  });
+
+  it('wires tap-to-hear before drag, locks a correct sticker, and hints a wrong drop without failing', () => {
+    const play = readFileSync(join(root, 'src/components/StickerPlay.vue'), 'utf8');
+    expect(play).toContain('speakStickerWord');
+    expect(play).toContain('wrongDropFeedback');
+    expect(play).toContain('readStickerOnboardSeen');
+    expect(play).toContain('markStickerOnboardSeen');
+    expect(play).toContain('copy.onboard');
+    expect(play).toContain('data-sticker-onboard');
+
+    const onDown = play.slice(play.indexOf('function onDown'), play.indexOf('function onMove'));
+    const speakAt = onDown.indexOf('speakStickerWord');
+    const dragListenAt = onDown.indexOf("window.addEventListener('pointermove'");
+    expect(speakAt).toBeGreaterThan(-1);
+    expect(dragListenAt).toBeGreaterThan(speakAt);
+    expect(onDown.slice(speakAt, dragListenAt)).not.toContain('return');
+    expect(onDown.indexOf('if (!playing.value) return;')).toBeLessThan(onDown.indexOf('initAudio(soundOn.value)'));
+    expect(onDown.indexOf('initAudio(soundOn.value)')).toBeLessThan(speakAt);
+    expect(onDown).not.toMatch(/heard|listenedBefore|mustListen|先聽過/);
+
+    const slotSection = play.slice(play.indexOf('class="slot-sticker"'), play.indexOf('class="word-label"'));
+    expect(slotSection).not.toContain('@pointerdown');
+    expect(play).toContain('@keydown.enter');
+    expect(play).toContain('@keydown.space');
+    expect(play).toContain('撳聽');
+    expect(play).toContain('feedback.message');
+    expect(play).toContain('hint: hintSlot === word');
+    expect(play).toContain('1600');
+    expect(play).not.toMatch(/overlay\.value\s*=\s*['"]fail['"]/);
+
+    const dealLevel = play.slice(play.indexOf('function dealLevel'), play.indexOf('function slotAtPoint'));
+    const unmounted = play.slice(play.indexOf('onUnmounted'), play.indexOf('</script>'));
+    expect(dealLevel).toContain('clearTimeout(hintTimer)');
+    expect(unmounted).toContain('clearTimeout(hintTimer)');
   });
 });
