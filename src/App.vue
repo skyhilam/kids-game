@@ -13,9 +13,10 @@ import { initializeLibrary } from './studio/store';
 
 useTouchGuard();
 
-const activity = ref<'hub' | 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen' | 'sequence' | 'formula'>('hub');
+const activity = ref<'hub' | 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen' | 'sequence' | 'formula' | 'phonics'>('hub');
 const SpriteStudio = defineAsyncComponent(() => import('./studio/SpriteStudio.vue'));
 const FormulaPlay = defineAsyncComponent(() => import('./components/FormulaPlay.vue'));
+const PhonicsPlay = defineAsyncComponent(() => import('./components/PhonicsPlay.vue'));
 const studioOpen = ref(window.location.hash === '#sprite-studio');
 function syncRoute() { studioOpen.value = window.location.hash === '#sprite-studio'; }
 function closeStudio() { window.location.hash = ''; }
@@ -34,4 +35,5 @@ onUnmounted(() => window.removeEventListener('hashchange', syncRoute));
   <ListenPlay v-else-if="activity === 'listen'" @home="activity = 'hub'"/>
   <SequencePlay v-else-if="activity === 'sequence'" @home="activity = 'hub'"/>
   <FormulaPlay v-else-if="activity === 'formula'" @home="activity = 'hub'"/>
+  <PhonicsPlay v-else-if="activity === 'phonics'" @home="activity = 'hub'"/>
 </template>

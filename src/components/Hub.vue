@@ -2,7 +2,7 @@
 import { STAGE_OVERVIEW } from '../game/stages';
 import GameSprite from './GameSprite.vue';
 const emit = defineEmits<{
-  pick: [activity: 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen' | 'sequence' | 'formula'];
+  pick: [activity: 'picnic' | 'tooth' | 'delivery' | 'sticker' | 'listen' | 'sequence' | 'formula' | 'phonics'];
 }>();
 </script>
 
@@ -111,6 +111,29 @@ const emit = defineEmits<{
         <strong>公式島</strong>
         <span>休息站：八個島區，由易到難。</span>
         <small class="hub-modes">8–14 歲 · 休息站小遊戲</small>
+      </button>
+      <button class="hub-card" type="button" @click="emit('pick', 'phonics')">
+        <svg class="hub-art" viewBox="0 0 220 120" aria-hidden="true">
+          <rect width="220" height="120" rx="22" fill="#d7f0fb"/>
+          <path d="M0 78h220v42H0z" fill="#7ec8e3"/>
+          <path d="M0 86c24-10 36 8 60 0s36 8 60 0 36 8 60 0 28-6 40 0v34H0z" fill="#b7e6f6"/>
+          <ellipse cx="112" cy="80" rx="58" ry="16" fill="#d9c48a"/>
+          <ellipse cx="112" cy="74" rx="46" ry="12" fill="#8fbf6e"/>
+          <path d="M104 74c2-28 8-40 8-40s6 12 8 40z" fill="#c9854a"/>
+          <ellipse cx="96" cy="42" rx="14" ry="7" fill="#5f9a52"/>
+          <ellipse cx="120" cy="40" rx="16" ry="8" fill="#6eae5c"/>
+          <ellipse cx="108" cy="34" rx="10" ry="6" fill="#87c472"/>
+          <circle cx="42" cy="36" r="16" fill="#fffdf8" stroke="#e2a33a" stroke-width="3"/>
+          <text x="42" y="42" text-anchor="middle" font-size="16" font-weight="700" fill="#2f5d73">B</text>
+          <circle cx="168" cy="30" r="18" fill="#fffdf8" stroke="#5aa7d6" stroke-width="3"/>
+          <text x="168" y="36" text-anchor="middle" font-size="16" font-weight="700" fill="#2f5d73">A</text>
+          <circle cx="128" cy="22" r="13" fill="#fff7ee" stroke="#e07a5f" stroke-width="3"/>
+          <text x="128" y="27" text-anchor="middle" font-size="12" font-weight="700" fill="#2f5d73">sh</text>
+          <circle cx="186" cy="72" r="7" fill="#ffe08a"/>
+        </svg>
+        <strong>語音島</strong>
+        <span>聽音認字母，8 個小島逐個解鎖。</span>
+        <small class="hub-modes">Phonics Island · 8 區</small>
       </button>
     </div>
     <p class="hub-studio-link"><a href="#sprite-studio">素材工房 <span>用 Canvas 製作自己的遊戲素材 →</span></a></p>

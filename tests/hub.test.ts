@@ -35,9 +35,9 @@ describe('hub landing metadata', () => {
     expect(hub).toMatch(/<strong>貼紙學單字<\/strong>/);
     expect(hub).toMatch(/拖貼紙配英文詞，全部放對就過關/);
     expect(hub).toMatch(/emit\('pick', 'sticker'\)/);
-    expect(app).toMatch(/'hub' \| 'picnic' \| 'tooth' \| 'delivery' \| 'sticker' \| 'listen' \| 'sequence'/);
+    expect(app).toMatch(/'hub' \| 'picnic' \| 'tooth' \| 'delivery' \| 'sticker' \| 'listen' \| 'sequence' \| 'formula' \| 'phonics'/);
     expect(app).toMatch(/StickerPlay/);
-    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(7);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(8);
   });
 
   it('adds 聽一聽揀圖 as a fifth card with listen activity', () => {
@@ -49,7 +49,7 @@ describe('hub landing metadata', () => {
     expect(hub).toMatch(/emit\('pick', 'listen'\)/);
     expect(app).toMatch(/ListenPlay/);
     expect(app).toMatch(/activity === 'listen'/);
-    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(7);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(8);
     expect(hub).toMatch(/emit\('pick', 'picnic'\)/);
     expect(hub).toMatch(/emit\('pick', 'sticker'\)/);
   });
@@ -63,7 +63,7 @@ describe('hub landing metadata', () => {
     expect(hub).toMatch(/emit\('pick', 'sequence'\)/);
     expect(app).toMatch(/SequencePlay/);
     expect(app).toMatch(/activity === 'sequence'/);
-    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(7);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(8);
     expect(hub).toMatch(/emit\('pick', 'listen'\)/);
   });
 
@@ -78,10 +78,10 @@ describe('hub landing metadata', () => {
     expect(card).toContain('<small class="hub-modes">8–14 歲 · 休息站小遊戲</small>');
     expect(card).not.toContain('hub-stages');
     expect(hub).toMatch(/emit\('pick', 'formula'\)/);
-    expect(hub).toMatch(/'listen' \| 'sequence' \| 'formula'/);
-    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(7);
+    expect(hub).toMatch(/'listen' \| 'sequence' \| 'formula' \| 'phonics'/);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(8);
     expect([...hub.matchAll(/class="hub-stages"/g)]).toHaveLength(3);
-    expect(app).toMatch(/'hub' \| 'picnic' \| 'tooth' \| 'delivery' \| 'sticker' \| 'listen' \| 'sequence' \| 'formula'/);
+    expect(app).toMatch(/'hub' \| 'picnic' \| 'tooth' \| 'delivery' \| 'sticker' \| 'listen' \| 'sequence' \| 'formula' \| 'phonics'/);
     expect(app).toMatch(/defineAsyncComponent\(\(\) => import\('\.\/components\/FormulaPlay\.vue'\)\)/);
     expect(app).toMatch(/<FormulaPlay v-else-if="activity === 'formula'" @home="activity = 'hub'"\/>/);
     expect(app).toMatch(/activity === 'picnic'/);
@@ -91,5 +91,30 @@ describe('hub landing metadata', () => {
     expect(app).toMatch(/activity === 'listen'/);
     expect(app).toMatch(/activity === 'sequence'/);
     expect(app).toMatch(/#sprite-studio/);
+  });
+
+  it('adds 語音島 as a hub card with phonics activity', () => {
+    const hub = readFileSync(join(root, 'src/components/Hub.vue'), 'utf8');
+    const app = readFileSync(join(root, 'src/App.vue'), 'utf8');
+    const card = hub.match(/<button class="hub-card" type="button" @click="emit\('pick', 'phonics'\)">[\s\S]*?<\/button>/)?.[0] ?? '';
+    expect(card).toContain('class="hub-art"');
+    expect(card).toContain('viewBox="0 0 220 120"');
+    expect(card).toContain('<strong>語音島</strong>');
+    expect(card).toContain('<span>聽音認字母，8 個小島逐個解鎖。</span>');
+    expect(card).toContain('<small class="hub-modes">Phonics Island · 8 區</small>');
+    expect(card).not.toContain('hub-stages');
+    expect(hub).toMatch(/emit\('pick', 'phonics'\)/);
+    expect(hub).not.toMatch(/JEI|Brain Safari/);
+    expect([...hub.matchAll(/class="hub-card"/g)]).toHaveLength(8);
+    expect([...hub.matchAll(/class="hub-stages"/g)]).toHaveLength(3);
+    expect(app).toMatch(/defineAsyncComponent\(\(\) => import\('\.\/components\/PhonicsPlay\.vue'\)\)/);
+    expect(app).toMatch(/<PhonicsPlay v-else-if="activity === 'phonics'" @home="activity = 'hub'"\/>/);
+    expect(app).toMatch(/activity === 'picnic'/);
+    expect(app).toMatch(/activity === 'tooth'/);
+    expect(app).toMatch(/activity === 'delivery'/);
+    expect(app).toMatch(/activity === 'sticker'/);
+    expect(app).toMatch(/activity === 'listen'/);
+    expect(app).toMatch(/activity === 'sequence'/);
+    expect(app).toMatch(/activity === 'formula'/);
   });
 });
