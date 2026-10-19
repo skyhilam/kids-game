@@ -303,6 +303,13 @@ describe('sticker stages, copy, and hub wiring', () => {
     expect(play).not.toMatch(/speak\(soundOn\.value,\s*id\)/);
     expect(play).not.toMatch(/speakEnglish\(soundOn\.value,\s*id\)/);
     expect(play).not.toMatch(/貼紙冊|100 枚/);
+    expect(play).toContain('parseStickerMode');
+    expect(play).toContain('nextCallout');
+    expect(play).toContain('tryPlaceCallout');
+    expect(play).toContain('recapOrder');
+    expect(play).toContain('hasEnglishSpeech');
+    expect(play).toContain('WORD_HINT');
+    expect(play).toContain('copy.replayLabel');
 
     const picnic = readFileSync(join(root, 'src/components/PicnicPlay.vue'), 'utf8');
     const tooth = readFileSync(join(root, 'src/components/ToothPlay.vue'), 'utf8');
@@ -587,5 +594,20 @@ describe('sticker hear-then-drag', () => {
     const unmounted = play.slice(play.indexOf('onUnmounted'), play.indexOf('</script>'));
     expect(dealLevel).toContain('clearTimeout(hintTimer)');
     expect(unmounted).toContain('clearTimeout(hintTimer)');
+  });
+
+  it('regression: a missed call-out does not end the level', () => {
+    const play = readFileSync(join(root, 'src/components/StickerPlay.vue'), 'utf8');
+    const body = play.slice(play.indexOf('function placeCallout'), play.indexOf('function placeFree'));
+    expect(body).toContain('tryPlaceCallout');
+    expect(body).toContain('copy.calloutWrong');
+    expect(body).toContain('speakEnglish(soundOn.value, WORD_EN[current])');
+    expect(body).not.toMatch(/overlay\.value\s*=\s*['"]win['"]/);
+    expect(body).not.toMatch(/overlay\.value\s*=\s*['"]fail['"]/);
+    expect(body).not.toMatch(/計時|扣分/);
+    expect(play).toContain('{{ WORD_EN[word] }}');
+    expect(play.indexOf('class="word-slots"')).toBeLessThan(play.indexOf('class="sticker-tray"'));
+    expect(play).toContain('setTimeout(run, RECAP_BEAT_MS)');
+    expect(play).toContain('const RECAP_BEAT_MS = 900');
   });
 });
